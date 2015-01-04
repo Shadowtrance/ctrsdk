@@ -145,7 +145,8 @@ TMD_CONTEXT process_tmd(FILE *tmd)
 CIA_HEADER set_cia_header(TMD_CONTEXT tmd_context, TIK_CONTEXT tik_context)
 {
 	CIA_HEADER cia_header;
-	memset(&cia_header,0,sizeof(cia_header));
+	u16 index, i;
+
 	cia_header.header_size = sizeof(CIA_HEADER);
 	cia_header.type = 0;
 	cia_header.version = 0;
@@ -154,11 +155,14 @@ CIA_HEADER set_cia_header(TMD_CONTEXT tmd_context, TIK_CONTEXT tik_context)
 	cia_header.tmd_size = tmd_context.tmd_size;
 	cia_header.meta_size = 0;
 	cia_header.content_size = get_content_size(tmd_context);
-	u64 index = 0;
-	for(int i = 0; i < tmd_context.content_count; i++){
-		index += (0x8000000000000000/(2<<u8_to_u16(tmd_context.content_struct[i].content_index,BE)))*2;
+
+	memset(cia_header.content_index, 0, sizeof(cia_header.content_index));
+	for (i = 0; i < tmd_context.content_count; i++) {
+		index = u8_to_u16(tmd_context.content_struct[i].content_index, BE);
+		cia_header.content_index[index / 8]
+			|= 0x80 >> index % 8;
 	}
-	u64_to_u8(cia_header.content_index,index,BE);
+
 	return cia_header;
 }
 
