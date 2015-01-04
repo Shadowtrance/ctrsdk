@@ -110,7 +110,7 @@ TMD_CONTEXT process_tmd(FILE *tmd)
 	
 	tmd_context.content_struct = malloc(sizeof(TMD_CONTENT_CHUNK_STRUCT)*tmd_context.content_count);
 	tmd_context.content = malloc(0x4*tmd_context.content_count);
-	for(u8 i = 0; i < tmd_context.content_count; i++){
+	for(u16 i = 0; i < tmd_context.content_count; i++){
 		tmd_context.content_struct[i] = get_tmd_content_struct(sig_size,i,tmd);
 		u8 content_id[16];
 		sprintf(content_id,"%08x",get_content_id(tmd_context.content_struct[i]));
@@ -338,7 +338,7 @@ TMD_STRUCT get_tmd_struct(u32 sig_size, FILE *tmd)
 	return tmd_struct;
 }
 
-TMD_CONTENT_CHUNK_STRUCT get_tmd_content_struct(u32 sig_size, u8 index, FILE *tmd)
+TMD_CONTENT_CHUNK_STRUCT get_tmd_content_struct(u32 sig_size, u16 index, FILE *tmd)
 {
 	fseek(tmd,(0x4+sig_size+sizeof(TMD_STRUCT)+sizeof(TMD_CONTENT_CHUNK_STRUCT)*index),SEEK_SET);
 	TMD_CONTENT_CHUNK_STRUCT content_struct;

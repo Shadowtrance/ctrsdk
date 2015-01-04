@@ -176,7 +176,7 @@ int write_content_data(FILE *content, u64 content_size, FILE *output);
 //Get Struct Functions
 TIK_STRUCT get_tik_struct(u32 sig_size, FILE *tik);
 TMD_STRUCT get_tmd_struct(u32 sig_size, FILE *tmd);
-TMD_CONTENT_CHUNK_STRUCT get_tmd_content_struct(u32 sig_size, u8 index, FILE *tmd);
+TMD_CONTENT_CHUNK_STRUCT get_tmd_content_struct(u32 sig_size, u16 index, FILE *tmd);
 
 //Printing Functions
 void print_content_chunk_info(TMD_CONTENT_CHUNK_STRUCT content_struct);
