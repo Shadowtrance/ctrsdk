@@ -159,8 +159,7 @@ CIA_HEADER set_cia_header(TMD_CONTEXT tmd_context, TIK_CONTEXT tik_context)
 	memset(cia_header.content_index, 0, sizeof(cia_header.content_index));
 	for (i = 0; i < tmd_context.content_count; i++) {
 		index = u8_to_u16(tmd_context.content_struct[i].content_index, BE);
-		cia_header.content_index[index / 8]
-			|= 0x80 >> index % 8;
+		cia_header.content_index[index >> 3] |= 0x80 >> (index & 7);
 	}
 
 	return cia_header;
