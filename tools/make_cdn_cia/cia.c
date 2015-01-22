@@ -79,6 +79,8 @@ TIK_CONTEXT process_tik(FILE *tik)
 TMD_CONTEXT process_tmd(FILE *tmd)
 {
 	TMD_CONTEXT tmd_context;
+        char content_id[16];
+
 	memset(&tmd_context,0x0,sizeof(tmd_context));
 	
 	tmd_context.tmd = tmd;
@@ -110,34 +112,28 @@ TMD_CONTEXT process_tmd(FILE *tmd)
 	
 	tmd_context.content_struct = malloc(sizeof(TMD_CONTENT_CHUNK_STRUCT)*tmd_context.content_count);
 	tmd_context.content = malloc(0x4*tmd_context.content_count);
-	for(u16 i = 0; i < tmd_context.content_count; i++){
+	for(u16 i = 0; i < tmd_context.content_count; i++) {
 		tmd_context.content_struct[i] = get_tmd_content_struct(sig_size,i,tmd);
-		u8 content_id[16];
-		sprintf(content_id,"%08x",get_content_id(tmd_context.content_struct[i]));
-		
-		#ifdef _WIN32 //Windows is not Case Sensitive
-		tmd_context.content[i] = fopen(content_id,"rb");
-		if(tmd_context.content[i] == NULL){
-			printf("[!] Content: '%s' could not be opened\n",content_id);
+		sprintf(content_id, "%08x",get_content_id(tmd_context.content_struct[i]));
+
+		tmd_context.content[i] = fopen(content_id, "rb");
+		if(tmd_context.content[i] == NULL) {
+#ifdef _WIN32
+			printf("[!] Content: '%s' could not be opened\n", content_id);
 			tmd_context.result = IO_FAIL;
 			return tmd_context;
-		}
-		#else //Everything else is case sensitive. 
-		tmd_context.content[i] = fopen(content_id,"rb");
-		if(tmd_context.content[i] == NULL){
-			for(int i = 0; i < 16; i++){
-				if(islower(content_id[i]) != 0 && isalpha(content_id[i]) != 0)
+#else
+			for (int i = 0; i < sizeof(content_id); i++)
+				if (islower(content_id[i]))
 					content_id[i] = toupper(content_id[i]);
-			}
-			tmd_context.content[i] = fopen(content_id,"rb");
-			if(tmd_context.content[i] == NULL){
-				printf("[!] Content: '%s' could not be opened\n",content_id);
+			tmd_context.content[i] = fopen(content_id, "rb");
+			if (tmd_context.content[i] == NULL) {
+				printf("[!] Content: '%s' could not be opened\n", content_id);
 				tmd_context.result = IO_FAIL;
 				return tmd_context;
 			}
+#endif
 		}
-		#endif
-		//print_content_chunk_info(tmd_context.content_struct[i]);
 	}
 	return tmd_context;
 }
