@@ -28,6 +28,12 @@ along with make_cdn_cia.  If not, see <http://www.gnu.org/licenses/>.
 
 typedef struct
 {
+	u32 offset[2];
+	u32 size[2];
+} cert_t;
+
+typedef struct
+{
 	u8 modulus[0x100];
 	u8 exponent[0x4];
 } RSA_2048_PUB_KEY;
@@ -60,7 +66,7 @@ typedef struct
 	u8 content_type[2];
 	u8 content_size[8];
 	u8 sha_256_hash[0x20];
-} TMD_CONTENT_CHUNK_STRUCT;
+} TMD_CONTENT;
 
 typedef struct
 {
@@ -106,15 +112,13 @@ typedef struct
 {
 	u8 result;
 
-	FILE *tmd;
+	FILE *fp;
 	u8 title_id[8];
 	u16 title_version;
-	u32 tmd_size;
-	u32 cert_offset[2];
-	u32 cert_size[2];
+	u32 size;
+	cert_t cert;
 	u16 content_count;
-	TMD_CONTENT_CHUNK_STRUCT *content_struct;
-	FILE **content;
+	TMD_CONTENT *content;
 	
 	u16 *title_index;
 } __attribute__((__packed__)) 
@@ -124,12 +128,11 @@ typedef struct
 {
 	u8 result;
 	
-	FILE *tik;
+	FILE *fp;
 	u8 title_id[8];
 	u16 title_version;
-	u32 tik_size;
-	u32 cert_offset[2];
-	u32 cert_size[2];
+	u32 size;
+	cert_t cert;
 } __attribute__((__packed__)) 
 TIK_CONTEXT;
 
@@ -146,39 +149,9 @@ typedef struct
 	u8 content_index[8192];
 } CIA_HEADER;
 
-//Main Function
-int generate_cia(TMD_CONTEXT tmd_context, TIK_CONTEXT tik_context, FILE *output);
+int generate_cia(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp);
 
-//Processing Functions
-TIK_CONTEXT process_tik(FILE *tik);
-TMD_CONTEXT process_tmd(FILE *tmd);
-CIA_HEADER set_cia_header(TMD_CONTEXT tmd_context, TIK_CONTEXT tik_context);
+TIK_CONTEXT process_tik(FILE *fp);
+TMD_CONTEXT process_tmd(FILE *fp);
 
-//Reading/Calc Functions
-u32 get_tik_size(u32 sig_size);
-u32 get_tmd_size(u32 sig_size, u16 content_count);
-u32 get_sig_size(u32 offset, FILE *file);
-u32 get_cert_size(u32 offset, FILE *file);
-u64 get_content_size(TMD_CONTEXT tmd_context);
-u64 read_content_size(TMD_CONTENT_CHUNK_STRUCT content_struct);
-u32 get_total_cert_size(TMD_CONTEXT tmd_context, TIK_CONTEXT tik_context);
-u32 get_content_id(TMD_CONTENT_CHUNK_STRUCT content_struct);
-
-//Writing functions
-int write_cia_header(TMD_CONTEXT tmd_context, TIK_CONTEXT tik_context, FILE *output);
-int write_cert_chain(TMD_CONTEXT tmd_context, TIK_CONTEXT tik_context, FILE *output);
-int write_tik(TMD_CONTEXT tmd_context, TIK_CONTEXT tik_context, FILE *output);
-int write_tmd(TMD_CONTEXT tmd_context, TIK_CONTEXT tik_context, FILE *output);
-int write_content(TMD_CONTEXT tmd_context, TIK_CONTEXT tik_context, FILE *output);
-int write_content_data(FILE *content, u64 content_size, FILE *output);
-
-//Get Struct Functions
-TIK_STRUCT get_tik_struct(u32 sig_size, FILE *tik);
-TMD_STRUCT get_tmd_struct(u32 sig_size, FILE *tmd);
-TMD_CONTENT_CHUNK_STRUCT get_tmd_content_struct(u32 sig_size, u16 index, FILE *tmd);
-
-//Printing Functions
-void print_content_chunk_info(TMD_CONTENT_CHUNK_STRUCT content_struct);
-
-//Checking Functions
-int check_tid(u8 *tid_0, u8 *tid_1);
+int check_tid(const u8 *tid0, const u8 *tid1);

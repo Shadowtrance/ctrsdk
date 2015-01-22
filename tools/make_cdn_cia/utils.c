@@ -192,7 +192,7 @@ return getcwd(buffer,maxlen);
 }
 
 //Data Size conversion
-u16 u8_to_u16(u8 *value, u8 endianness)
+u16 u8_to_u16(const u8 *value, u8 endianness)
 {
 	u16 new_value;
 	switch(endianness){
@@ -213,7 +213,7 @@ u32 u8_to_u32(u8 *value, u8 endianness)
 }
 
 
-u64 u8_to_u64(u8 *value, u8 endianness)
+u64 u8_to_u64(const u8 *value, u8 endianness)
 {
 	u64 u64_return = 0;
 	switch(endianness){

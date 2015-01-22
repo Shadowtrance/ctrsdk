@@ -71,7 +71,6 @@ int main(int argc, char *argv[])
 	//Error Checking
 	if(tik_context.result != 0 || tmd_context.result != 0){
 		printf("[!] Input files could not be processed successfully\n");
-		free(tmd_context.content_struct);
 		free(tmd_context.content);
 		fclose(tik);
 		fclose(tmd);
@@ -100,13 +99,16 @@ int main(int argc, char *argv[])
 		return IO_FAIL;
 	}
 	
-	int result = generate_cia(tmd_context,tik_context,output);
+	int result = generate_cia(&tmd_context, &tik_context, output);
 	if(result != 0){
 		printf("[!] Failed to Generate %s\n",argv[2]);
 		remove(argv[2]);
 	}
 	else
 		printf("[*] %s Generated Sucessfully\n",argv[2]);
+	fclose(tik);
+	fclose(tmd);
+	free(tmd_context.content);
 	
 	return 0;
 }
