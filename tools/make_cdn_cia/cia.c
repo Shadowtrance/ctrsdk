@@ -304,7 +304,8 @@ TIK_CONTEXT process_tik(FILE *fp)
 	TIK_CONTEXT tik_context;
 	TIK_STRUCT tik_struct;
 	u32 sig_size;
-	
+
+	tik_context.result = 0;
 	tik_context.fp = fp;
 	
 	sig_size = get_sig_size(0, fp);
@@ -343,7 +344,8 @@ TMD_CONTEXT process_tmd(FILE *fp)
 	TMD_STRUCT tmd_struct;
 	u32 sig_size;
 	int i;
-	
+
+	tmd_context.result = 0;
 	tmd_context.fp = fp;
 	
 	sig_size = get_sig_size(0, fp);
