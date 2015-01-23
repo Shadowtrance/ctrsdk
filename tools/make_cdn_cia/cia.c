@@ -57,16 +57,6 @@ static u32 get_cert_size(long offset, FILE *fp)
 		(4 + sig_size + sizeof(CERT_2048KEY_DATA_STRUCT));
 }
 
-static u32 get_tik_size(u32 sig_size)
-{
-	return 4 + sig_size + sizeof(TIK_STRUCT);
-}
-
-static u32 get_tmd_size(u32 sig_size, u16 count)
-{
-	return 4 + sig_size + sizeof(TMD_STRUCT) + sizeof(TMD_CONTENT) * count;
-}
-
 static u64 read_content_size(const TMD_CONTENT *content)
 {
 	return u8_to_u64(content->content_size, BE);
@@ -325,13 +315,8 @@ TIK_CONTEXT process_tik(FILE *fp)
 	}
 	
 	tik_struct = get_tik_struct(sig_size, fp);
-	tik_context.size = get_tik_size(sig_size);
+	tik_context.size = 4 + sig_size + sizeof(TIK_STRUCT);
 	tik_context.title_version = u8_to_u16(tik_struct.title_version, BE);
-	
-	if (tik_context.size == ERR_UNRECOGNISED_SIG) {
-		tik_context.result = ERR_UNRECOGNISED_SIG;
-		return tik_context;
-	}
 	
 	tik_context.cert.offset[0] = tik_context.size;
 	tik_context.cert.size[0] = get_cert_size(tik_context.size, fp);
@@ -371,7 +356,7 @@ TMD_CONTEXT process_tmd(FILE *fp)
 	
 	tmd_struct = get_tmd_struct(sig_size, fp);
 	tmd_context.content_count = u8_to_u16(tmd_struct.content_count, BE);
-	tmd_context.size = get_tmd_size(sig_size, tmd_context.content_count);
+	tmd_context.size = 4 + sig_size + sizeof(TMD_STRUCT) + sizeof(TMD_CONTENT) * tmd_context.content_count;
 	tmd_context.title_version = u8_to_u16(tmd_struct.title_version, BE);
 	
 	tmd_context.cert.offset[0] = tmd_context.size;
