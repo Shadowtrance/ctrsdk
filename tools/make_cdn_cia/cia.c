@@ -134,7 +134,7 @@ static int write_cia_header(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE
 
 	if (fseek(fp, 0, SEEK_SET))
 		return IO_FAIL;
-	if (fwrite(&hdr, sizeof(hdr), 1, fp) != sizeof(hdr))
+	if (fwrite(&hdr, sizeof(hdr), 1, fp) <= 0)
 		return IO_FAIL;
 
 	return IO_FAIL;
@@ -152,23 +152,23 @@ static int write_cert_chain(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE
 
 	if (fseek(tik->fp, tik->cert.offset[1], SEEK_SET) < 0)
 		return IO_FAIL;
-	if (fread(cert, tik->cert.size[1], 1, tik->fp) != tik->cert.size[1])
+	if (fread(cert, tik->cert.size[1], 1, tik->fp) <= 0)
 		return IO_FAIL;
-	if (fwrite(cert, tik->cert.size[1], 1, fp) != tik->cert.size[1])
+	if (fwrite(cert, tik->cert.size[1], 1, fp) <= 0)
 		return IO_FAIL;
 
 	if (fseek(tik->fp, tik->cert.offset[0], SEEK_SET) < 0)
 		return IO_FAIL;
-	if (fread(cert, tik->cert.size[0], 1, tik->fp) != tik->cert.size[0])
+	if (fread(cert, tik->cert.size[0], 1, tik->fp) <= 0)
 		return IO_FAIL;
-	if (fwrite(cert, tik->cert.size[0], 1, fp) != tik->cert.size[0])
+	if (fwrite(cert, tik->cert.size[0], 1, fp) <= 0)
 		return IO_FAIL;
 
 	if (fseek(tmd->fp, tmd->cert.offset[0], SEEK_SET) != tmd->cert.offset[0])
 		return IO_FAIL;
-	if (fread(cert, tmd->cert.size[0], 1, tmd->fp) != tmd->cert.size[0])
+	if (fread(cert, tmd->cert.size[0], 1, tmd->fp) <= 0)
 		return IO_FAIL;
-	if (fwrite(&cert, tmd->cert.size[0], 1, fp) != tmd->cert.size[0])
+	if (fwrite(&cert, tmd->cert.size[0], 1, fp) <= 0)
 		return IO_FAIL;
 	
 	return 0;
@@ -188,9 +188,9 @@ static int write_tik(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp)
 		return IO_FAIL;
 	if (fseek(tik->fp, 0, SEEK_SET) < 0)
 		return IO_FAIL;
-	if (fread(buf, tik->size, 1, tik->fp) != tik->size)
+	if (fread(buf, tik->size, 1, tik->fp) <= 0)
 		return IO_FAIL;
-	if (fwrite(buf, tik->size, 1, fp) != tik->size)
+	if (fwrite(buf, tik->size, 1, fp) <= 0)
 		return IO_FAIL;
 
 	return 0;
@@ -213,7 +213,7 @@ static int write_tmd(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp)
 		return IO_FAIL;
 	if (fread(buf, tmd->size, 1, tmd->fp) < 0)
 		return IO_FAIL;
-	if (fwrite(buf, tmd->size, 1, fp) != tmd->size)
+	if (fwrite(buf, tmd->size, 1, fp) <= 0)
 		return IO_FAIL;
 
 	return 0;
@@ -258,14 +258,14 @@ static int write_content(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *f
 #endif
 		}
 		for (left = read_content_size(&tmd->content[i]); left > sizeof(buf); left -= sizeof(buf)) {
-			if (fread(buf, sizeof(buf), 1, content) != sizeof(buf))
+			if (fread(buf, sizeof(buf), 1, content) <= 0)
 				return IO_FAIL;
-			if (fwrite(buf, sizeof(buf), 1, fp) != sizeof(buf))
+			if (fwrite(buf, sizeof(buf), 1, fp) <= 0)
 				return IO_FAIL;
 		}
-		if (fread(buf, left, 1, content) != left)
+		if (fread(buf, left, 1, content) <= 0)
 			return IO_FAIL;
-		if (fwrite(buf, left, 1, fp) != left)
+		if (fwrite(buf, left, 1, fp) <= 0)
 			return IO_FAIL;
 		fclose(content);
 	}
