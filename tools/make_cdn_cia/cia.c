@@ -137,7 +137,7 @@ static int write_cia_header(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE
 	if (fwrite(&hdr, sizeof(hdr), 1, fp) <= 0)
 		return IO_FAIL;
 
-	return IO_FAIL;
+	return 0;
 }
 
 static int write_cert_chain(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp)
@@ -147,24 +147,24 @@ static int write_cert_chain(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE
 	if (tmd == NULL || tik == NULL || fp == NULL)
 		return -1;
 
-	if (fseek(fp, align_value(sizeof(CIA_HEADER), 64), SEEK_SET) < 0)
+	if (fseek(fp, align_value(sizeof(CIA_HEADER), 64), SEEK_SET))
 		return IO_FAIL;
 
-	if (fseek(tik->fp, tik->cert.offset[1], SEEK_SET) < 0)
+	if (fseek(tik->fp, tik->cert.offset[1], SEEK_SET))
 		return IO_FAIL;
 	if (fread(cert, tik->cert.size[1], 1, tik->fp) <= 0)
 		return IO_FAIL;
 	if (fwrite(cert, tik->cert.size[1], 1, fp) <= 0)
 		return IO_FAIL;
 
-	if (fseek(tik->fp, tik->cert.offset[0], SEEK_SET) < 0)
+	if (fseek(tik->fp, tik->cert.offset[0], SEEK_SET))
 		return IO_FAIL;
 	if (fread(cert, tik->cert.size[0], 1, tik->fp) <= 0)
 		return IO_FAIL;
 	if (fwrite(cert, tik->cert.size[0], 1, fp) <= 0)
 		return IO_FAIL;
 
-	if (fseek(tmd->fp, tmd->cert.offset[0], SEEK_SET) != tmd->cert.offset[0])
+	if (fseek(tmd->fp, tmd->cert.offset[0], SEEK_SET))
 		return IO_FAIL;
 	if (fread(cert, tmd->cert.size[0], 1, tmd->fp) <= 0)
 		return IO_FAIL;
@@ -184,9 +184,9 @@ static int write_tik(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp)
 	if (fseek(fp,
 		align_value(get_total_cert_size(tmd, tik), 64)
 			+ align_value(sizeof(CIA_HEADER), 64),
-		SEEK_SET) < 0)
+		SEEK_SET))
 		return IO_FAIL;
-	if (fseek(tik->fp, 0, SEEK_SET) < 0)
+	if (fseek(tik->fp, 0, SEEK_SET))
 		return IO_FAIL;
 	if (fread(buf, tik->size, 1, tik->fp) <= 0)
 		return IO_FAIL;
@@ -207,9 +207,9 @@ static int write_tmd(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp)
 		align_value(tik->size, 64)
 			+ align_value(get_total_cert_size(tmd, tik), 64)
 			+ align_value(sizeof(CIA_HEADER), 64),
-		SEEK_SET) < 0)
+		SEEK_SET))
 		return IO_FAIL;
-	if (fseek(tmd->fp, 0, SEEK_SET) < 0)
+	if (fseek(tmd->fp, 0, SEEK_SET))
 		return IO_FAIL;
 	if (fread(buf, tmd->size, 1, tmd->fp) < 0)
 		return IO_FAIL;
@@ -234,7 +234,7 @@ static int write_content(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *f
 			+ align_value(tik->size, 64)
 			+ align_value(get_total_cert_size(tmd, tik), 64)
 			+ align_value(sizeof(CIA_HEADER), 64),
-		SEEK_SET) < 0)
+		SEEK_SET))
 		return IO_FAIL;
 
 	for (i = 0; i < tmd->content_count; i++) {
