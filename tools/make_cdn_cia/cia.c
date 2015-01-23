@@ -235,7 +235,8 @@ static int write_content(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *f
 		content = fopen(buf, "rb");
 		if (content == NULL) {
 #ifdef _WIN32
-			printf("[!] Content: '%s' could not be opened\n", buf);
+			sprintf(buf, "[!] Content %08x", get_content_id(tmd->content[i]));
+			perror(buf);
 			return IO_FAIL;
 #else
 			for (i = 0; i < 16; i++)
@@ -244,7 +245,8 @@ static int write_content(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *f
 
 			content = fopen(buf, "rb");
 			if (content == NULL) {
-				printf("[!] Content: '%s' could not be opened\n", buf);
+				sprintf(buf, "[!] Content %08x", get_content_id(tmd->content[i]));
+				perror(buf);
 				return IO_FAIL;
 			}
 #endif
