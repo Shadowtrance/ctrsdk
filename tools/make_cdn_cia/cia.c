@@ -93,14 +93,6 @@ static TMD_STRUCT get_tmd_struct(u32 sig_size, FILE *tmd)
 	return tmd_struct;
 }
 
-static TMD_CONTENT get_tmd_content_struct(u32 sig_size, u16 index, FILE *tmd)
-{
-	fseek(tmd,(0x4+sig_size+sizeof(TMD_STRUCT)+sizeof(TMD_CONTENT)*index),SEEK_SET);
-	TMD_CONTENT content_struct;
-	fread(&content_struct,sizeof(content_struct),1,tmd);
-	return content_struct;
-}
-
 static u32 get_total_cert_size(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik)
 {
 	if (tmd == NULL || tik == NULL)
@@ -374,8 +366,8 @@ TMD_CONTEXT process_tmd(FILE *fp)
 	memcpy(tmd_context.title_id, tmd_struct.title_id, 8);
 	
 	tmd_context.content = malloc(sizeof(TMD_CONTENT) * tmd_context.content_count);
-	for (i = 0; i < tmd_context.content_count; i++)
-		tmd_context.content[i] = get_tmd_content_struct(sig_size, i, fp);
+	fseek(fp, 4 + sig_size + sizeof(TMD_STRUCT), SEEK_SET);
+	fread(tmd_context.content,sizeof(content_struct), tmd_context.content_count, fp);
 
 	return tmd_context;
 }
