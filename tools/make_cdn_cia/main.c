@@ -18,10 +18,10 @@
  * along with make_cdn_cia.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "lib.h"
 #include "cia.h"
 #include <endian.h>
 #include <errno.h>
+#include <unistd.h>
 
 #define VER "1.00"
 
@@ -76,8 +76,8 @@ int main(int argc, char *argv[])
 
 	if (tik.title_id != tmd.title_id) {
 		printf("[!] Caution, Ticket and TMD Title IDs do not match\n"
-			"[!] CETK Title ID: 0x%016jX\n"
-			"[!] TMD Title ID:  0x%016jX\n",
+			"[!] CETK Title ID: 0x%016lluX\n"
+			"[!] TMD Title ID:  0x%016lluX\n",
 			be64toh(tik.title_id), be64toh(tmd.title_id));
 	}
 	if (tik.title_version != tmd.title_version) {
