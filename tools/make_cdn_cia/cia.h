@@ -16,20 +16,22 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with make_cdn_cia.  If not, see <http://www.gnu.org/licenses/>.
 **/
-//Sig Types
-#define Elliptic_Curve_1 0x05000100
-#define RSA_2048_SHA256 0x04000100
-#define RSA_4096_SHA256 0x03000100
-#define Elliptic_Curve_0 0x02000100
-#define RSA_2048_SHA1 0x01000100
-#define RSA_4096_SHA1 0x00000100
-//Errors
-#define ERR_UNRECOGNISED_SIG 2
+#include "lib.h"
+
+enum {
+	SIGTYPE_RSA4096_SHA1 = 0x10000,
+	SIGTYPE_RSA2048_SHA1 = 0x10001,
+	SIGTYPE_ECDSA_SHA1 = 0x10002,
+	SIGTYPE_RSA4096_SHA256 = 0x10003,
+	SIGTYPE_RSA2048_SHA256 = 0x10004,
+	SIGTYPE_ECDSA_SHA256 = 0x10005
+};
+#define SIGTYPE_MIN SIGTYPE_RSA4096_SHA1
 
 typedef struct
 {
-	u32 offset[2];
-	u32 size[2];
+	u32 offset;
+	u32 size;
 } cert_t;
 
 typedef struct
@@ -61,10 +63,10 @@ typedef struct
 
 typedef struct
 {
-	u8 content_id[4];
-	u8 content_index[2];
+	uint32_t content_id;
+	uint16_t content_index;
 	u8 content_type[2];
-	u8 content_size[8];
+	uint64_t size;
 	u8 sha_256_hash[0x20];
 } TMD_CONTENT;
 
@@ -76,8 +78,8 @@ typedef struct
 	u8 title_type[4];
 	u8 reserved[0x40];
 	u8 access_rights[4];
-	u8 title_version[2];
-	u8 content_count[2];
+	uint16_t title_version;
+	uint16_t content_count;
 	u8 boot_content[2];
 	u8 padding[2];
 	u8 sha_256_hash[0x20];
@@ -101,7 +103,7 @@ typedef struct
 	u8 ticket_consoleID[4];
 	u64 title_id;
 	u8 unknown_1[2];
-	u8 title_version[2];
+	uint16_t title_version;
 	u8 unused_0[8];
 	u8 unused_1;
 	u8 common_key_index;
@@ -114,7 +116,7 @@ typedef struct
 	u64 title_id;
 	u16 title_version;
 	u32 size;
-	cert_t cert;
+	cert_t cert[2];
 	u16 content_count;
 	TMD_CONTENT *content;
 	
@@ -128,7 +130,7 @@ typedef struct
 	u64 title_id;
 	u16 title_version;
 	u32 size;
-	cert_t cert;
+	cert_t cert[2];
 } __attribute__((__packed__)) 
 TIK_CONTEXT;
 

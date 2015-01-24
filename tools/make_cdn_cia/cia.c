@@ -1,110 +1,72 @@
-/**
-Copyright 2013 3DSGuy
+/*
+ * Copyright 2013 3DSGuy
+ * Copyright 2015 173210
+ *
+ * This file is part of make_cdn_cia.
+ *
+ * make_cdn_cia is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
 
-This file is part of make_cdn_cia.
-
-make_cdn_cia is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-make_cdn_cia is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with make_cdn_cia.  If not, see <http://www.gnu.org/licenses/>.
-**/
-#include "lib.h"
+ * make_cdn_cia is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with make_cdn_cia.  If not, see <http://www.gnu.org/licenses/>.
+ */
 #include "cia.h"
+#include <errno.h>
+#include <stdio.h>
 
-static u32 get_sig_size(long offset, FILE *fp)
+static size_t get_sig_size(long offset, FILE *fp)
 {
-	u32 sig_type;
+	uint32_t sig_type;
 
-	fseek(fp, offset, SEEK_SET);
-	fread(&sig_type,sizeof(sig_type), 1, fp);
-	switch(sig_type) {
-		/*
-		case(RSA_4096_SHA1):
-			return 0x200;
-		case(RSA_2048_SHA1):
-			return 0x100;
-		case(Elliptic_Curve_0):
-			return 0x3C;
-		*/
-		case(RSA_4096_SHA256):
-			return 0x200;
-		case(RSA_2048_SHA256):
-			return 0x100;
-		/*
-		case(Elliptic_Curve_1):
-			return 0x3C;
-		*/
+	if (fseek(fp, offset, SEEK_SET))
+		return errno;
+	if (fread(&sig_type, sizeof(sig_type), 1, fp) <= 0)
+		return errno;
+	switch (be32toh(sig_type)) {
+		case SIGTYPE_RSA4096_SHA1:
+		case SIGTYPE_RSA4096_SHA256:
+			return 512;
+
+		case SIGTYPE_RSA2048_SHA1:
+		case SIGTYPE_RSA2048_SHA256:
+			return 256;
+
+		case SIGTYPE_ECDSA_SHA1:
+		case SIGTYPE_ECDSA_SHA256:
+			return 60;
+
+		default:
+			return EILSEQ;
 	}
-
-	return ERR_UNRECOGNISED_SIG;
 }
 
-static u32 get_cert_size(long offset, FILE *fp)
+static size_t get_cert_size(long offset, FILE *fp)
 {
-	u32 sig_size;
+	size_t sig_size;
 
 	sig_size = get_sig_size(offset, fp);
-	return sig_size == ERR_UNRECOGNISED_SIG ?
-		ERR_UNRECOGNISED_SIG :
-		(4 + sig_size + sizeof(CERT_2048KEY_DATA_STRUCT));
+	return sig_size < SIGTYPE_MIN ? sig_size : 4 + sig_size + sizeof(CERT_2048KEY_DATA_STRUCT);
 }
 
-static u64 read_content_size(const TMD_CONTENT *content)
-{
-	return u8_to_u64(content->content_size, BE);
-}
-
-static u64 get_content_size(const TMD_CONTEXT *tmd)
-{
-	u64 content_size = 0;
-
-	for(int i = 0; i < tmd->content_count; i++)
-		content_size += read_content_size(&tmd->content[i]);
-
-	return content_size;
-}
-
-static u32 get_content_id(TMD_CONTENT content_struct)
-{
-	return u8_to_u32(content_struct.content_id,BE);
-}
-
-static TIK_STRUCT get_tik_struct(u32 sig_size, FILE *tik)
-{
-	TIK_STRUCT tik_struct;
-	fseek(tik,(0x4+sig_size),SEEK_SET);
-	fread(&tik_struct,sizeof(tik_struct),1,tik);
-	return tik_struct;
-}
-
-static TMD_STRUCT get_tmd_struct(u32 sig_size, FILE *tmd)
-{
-	TMD_STRUCT tmd_struct;
-	fseek(tmd,(0x4+sig_size),SEEK_SET);
-	fread(&tmd_struct,sizeof(tmd_struct),1,tmd);
-	return tmd_struct;
-}
-
-static u32 get_total_cert_size(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik)
+static size_t get_total_cert_size(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd)
 {
 	if (tmd == NULL || tik == NULL)
-		return 0;
+		return EFAULT;
 
-	return tik->cert.size[1] + tik->cert.size[0] + tmd->cert.size[0];
+	return tik->cert[1].size + tik->cert[0].size + tmd->cert[0].size;
 }
 
-static int write_cia_header(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp)
+static int write_cia_header(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd, FILE *fp)
 {
 	CIA_HEADER hdr;
-	u16 index, i;
+	uint16_t index, i;
 
 	if (tmd == NULL || tik == NULL || fp == NULL)
 		return -1;
@@ -112,27 +74,29 @@ static int write_cia_header(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE
 	hdr.header_size = sizeof(hdr);
 	hdr.type = 0;
 	hdr.version = 0;
-	hdr.cert_size = get_total_cert_size(tmd, tik);
+	hdr.cert_size = get_total_cert_size(tik, tmd);
 	hdr.tik_size = tik->size;
 	hdr.tmd_size = tmd->size;
 	hdr.meta_size = 0;
-	hdr.content_size = get_content_size(tmd);
+	hdr.content_size = 0;
+	for (i = 0; i < tmd->content_count; i++)
+		hdr.content_size += be64toh(tmd->content[i].size);
 
 	memset(hdr.content_index, 0, sizeof(hdr.content_index));
 	for (i = 0; i < tmd->content_count; i++) {
-		index = u8_to_u16(tmd->content[i].content_index, BE);
+		index = be16toh(tmd->content[i].content_index);
 		hdr.content_index[index >> 3] |= 0x80 >> (index & 7);
 	}
 
 	if (fseek(fp, 0, SEEK_SET))
-		return IO_FAIL;
+		return errno;
 	if (fwrite(&hdr, sizeof(hdr), 1, fp) <= 0)
-		return IO_FAIL;
+		return errno;
 
 	return 0;
 }
 
-static int write_cert_chain(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp)
+static int write_cert_chain(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd, FILE *fp)
 {
 	u8 cert[4096];
 
@@ -142,31 +106,31 @@ static int write_cert_chain(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE
 	if (fseek(fp, align_value(sizeof(CIA_HEADER), 64), SEEK_SET))
 		return IO_FAIL;
 
-	if (fseek(tik->fp, tik->cert.offset[1], SEEK_SET))
+	if (fseek(tik->fp, tik->cert[1].offset, SEEK_SET))
 		return IO_FAIL;
-	if (fread(cert, tik->cert.size[1], 1, tik->fp) <= 0)
+	if (fread(cert, tik->cert[1].size, 1, tik->fp) <= 0)
 		return IO_FAIL;
-	if (fwrite(cert, tik->cert.size[1], 1, fp) <= 0)
-		return IO_FAIL;
-
-	if (fseek(tik->fp, tik->cert.offset[0], SEEK_SET))
-		return IO_FAIL;
-	if (fread(cert, tik->cert.size[0], 1, tik->fp) <= 0)
-		return IO_FAIL;
-	if (fwrite(cert, tik->cert.size[0], 1, fp) <= 0)
+	if (fwrite(cert, tik->cert[1].size, 1, fp) <= 0)
 		return IO_FAIL;
 
-	if (fseek(tmd->fp, tmd->cert.offset[0], SEEK_SET))
+	if (fseek(tik->fp, tik->cert[0].offset, SEEK_SET))
 		return IO_FAIL;
-	if (fread(cert, tmd->cert.size[0], 1, tmd->fp) <= 0)
+	if (fread(cert, tik->cert[0].size, 1, tik->fp) <= 0)
 		return IO_FAIL;
-	if (fwrite(&cert, tmd->cert.size[0], 1, fp) <= 0)
+	if (fwrite(cert, tik->cert[0].size, 1, fp) <= 0)
+		return IO_FAIL;
+
+	if (fseek(tmd->fp, tmd->cert[0].offset, SEEK_SET))
+		return IO_FAIL;
+	if (fread(cert, tmd->cert[0].size, 1, tmd->fp) <= 0)
+		return IO_FAIL;
+	if (fwrite(&cert, tmd->cert[0].size, 1, fp) <= 0)
 		return IO_FAIL;
 	
 	return 0;
 }
 
-static int write_tik(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp)
+static int write_tik(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd, FILE *fp)
 {
 	u8 buf[tik->size];
 
@@ -174,7 +138,7 @@ static int write_tik(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp)
 		return -1;
 
 	if (fseek(fp,
-		align_value(get_total_cert_size(tmd, tik), 64)
+		align_value(get_total_cert_size(tik, tmd), 64)
 			+ align_value(sizeof(CIA_HEADER), 64),
 		SEEK_SET))
 		return IO_FAIL;
@@ -188,7 +152,7 @@ static int write_tik(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp)
 	return 0;
 }
 
-static int write_tmd(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp)
+static int write_tmd(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd, FILE *fp)
 {
 	u8 buf[tmd->size];
 
@@ -197,7 +161,7 @@ static int write_tmd(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp)
 
 	if (fseek(fp,
 		align_value(tik->size, 64)
-			+ align_value(get_total_cert_size(tmd, tik), 64)
+			+ align_value(get_total_cert_size(tik, tmd), 64)
 			+ align_value(sizeof(CIA_HEADER), 64),
 		SEEK_SET))
 		return IO_FAIL;
@@ -211,11 +175,11 @@ static int write_tmd(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp)
 	return 0;
 }
 
-static int write_content(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp)
+static int write_content(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd, FILE *fp)
 {
 	FILE *content;
-	u16 i;
-	u64 left;
+	uint16_t i;
+	uint64_t left;
 	char buf[1048576];
 
 	if (tmd == NULL || tik == NULL || fp == NULL)
@@ -224,18 +188,18 @@ static int write_content(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *f
 	if (fseek(fp,
 		align_value(tmd->size, 64)
 			+ align_value(tik->size, 64)
-			+ align_value(get_total_cert_size(tmd, tik), 64)
+			+ align_value(get_total_cert_size(tik, tmd), 64)
 			+ align_value(sizeof(CIA_HEADER), 64),
 		SEEK_SET))
 		return IO_FAIL;
 
 	for (i = 0; i < tmd->content_count; i++) {
-		sprintf(buf, "%08x", get_content_id(tmd->content[i]));
+		sprintf(buf, "%08x", be32toh(tmd->content[i].content_id));
 
 		content = fopen(buf, "rb");
 		if (content == NULL) {
 #ifdef _WIN32
-			sprintf(buf, "[!] Content %08x", get_content_id(tmd->content[i]));
+			sprintf(buf, "[!] Content %08x", be32toh(tmd->content[i].content_id));
 			perror(buf);
 			return IO_FAIL;
 #else
@@ -245,13 +209,13 @@ static int write_content(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *f
 
 			content = fopen(buf, "rb");
 			if (content == NULL) {
-				sprintf(buf, "[!] Content %08x", get_content_id(tmd->content[i]));
+				sprintf(buf, "[!] Content %08x", be32toh(tmd->content[i].content_id));
 				perror(buf);
 				return IO_FAIL;
 			}
 #endif
 		}
-		for (left = read_content_size(&tmd->content[i]); left > sizeof(buf); left -= sizeof(buf)) {
+		for (left = be64toh(tmd->content[i].size); left > sizeof(buf); left -= sizeof(buf)) {
 			if (fread(buf, sizeof(buf), 1, content) <= 0)
 				return IO_FAIL;
 			if (fwrite(buf, sizeof(buf), 1, fp) <= 0)
@@ -271,19 +235,19 @@ int generate_cia(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp)
 {
 	int ret;
 
-	ret = write_cia_header(tmd, tik, fp);
+	ret = write_cia_header(tik, tmd, fp);
 	if (ret)
 		return ret;
-	ret = write_cert_chain(tmd, tik, fp);
+	ret = write_cert_chain(tik, tmd, fp);
 	if (ret)
 		return ret;
-	ret = write_tik(tmd, tik, fp);
+	ret = write_tik(tik, tmd, fp);
 	if (ret)
 		return ret;
-	ret = write_tmd(tmd, tik, fp);
+	ret = write_tmd(tik, tmd, fp);
 	if (ret)
 		return ret;
-	ret = write_content(tmd, tik, fp);
+	ret = write_content(tik, tmd, fp);
 	if (ret)
 		return ret;
 
@@ -296,30 +260,37 @@ int generate_cia(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp)
 int process_tik(TIK_CONTEXT *tik_context)
 {
 	TIK_STRUCT tik_struct;
-	u32 sig_size;
+	size_t sig_size;
+
+	if (tik_context == NULL)
+		return EFAULT;
 
 	sig_size = get_sig_size(0, tik_context->fp);
-	if (sig_size == ERR_UNRECOGNISED_SIG) {
+	if (sig_size < SIGTYPE_MIN) {
 		printf("[!] The CETK signature could not be recognised\n");
-		return ERR_UNRECOGNISED_SIG;
+		return sig_size;
 	}
 
-	tik_struct = get_tik_struct(sig_size, tik_context->fp);
-	tik_context->title_version = u8_to_u16(tik_struct.title_version, BE);
+	if (fseek(tik_context->fp, 4 + sig_size, SEEK_SET))
+		return errno;
+	if (fread(&tik_struct, sizeof(tik_struct), 1, tik_context->fp) <= 0)
+		return errno;
+
+	tik_context->title_version = be16toh(tik_struct.title_version);
 	tik_context->size = 4 + sig_size + sizeof(TIK_STRUCT);
 
-	if (tik_context->size == ERR_UNRECOGNISED_SIG) {
-		return ERR_UNRECOGNISED_SIG;
+	tik_context->cert[0].offset = tik_context->size;
+	tik_context->cert[0].size = get_cert_size(tik_context->cert[0].offset, tik_context->fp);
+	if (tik_context->cert[0].size < SIGTYPE_MIN) {
+		printf("[!] The first signatures in the CETK 'Cert Chain' is unrecognised.\n");
+		return tik_context->cert[0].size;
 	}
 
-	tik_context->cert.offset[0] = tik_context->size;
-	tik_context->cert.size[0] = get_cert_size(tik_context->size, tik_context->fp);
-	tik_context->cert.offset[1] = tik_context->size + tik_context->cert.size[0];
-	tik_context->cert.size[1] = get_cert_size(tik_context->cert.offset[1], tik_context->fp);
-
-	if (tik_context->cert.size[0] == ERR_UNRECOGNISED_SIG || tik_context->cert.size[1] == ERR_UNRECOGNISED_SIG) {
-		printf("[!] One or both of the signatures in the CETK 'Cert Chain' are unrecognised\n");
-		return ERR_UNRECOGNISED_SIG;
+	tik_context->cert[1].offset = tik_context->cert[0].offset + tik_context->cert[0].size;
+	tik_context->cert[1].size = get_cert_size(tik_context->cert[1].offset, tik_context->fp);
+	if (tik_context->cert[1].size < SIGTYPE_MIN) {
+		printf("[!] The second signatures in the CETK 'Cert Chain' is unrecognised.\n");
+		return tik_context->cert[1].size;
 	}
 	tik_context->title_id = tik_struct.title_id;
 
@@ -329,33 +300,46 @@ int process_tik(TIK_CONTEXT *tik_context)
 int process_tmd(TMD_CONTEXT *tmd_context)
 {
 	TMD_STRUCT tmd_struct;
-	u32 sig_size;
+	size_t sig_size;
 	int i;
 
+	if (tmd_context == NULL)
+		return EFAULT;
+
 	sig_size = get_sig_size(0, tmd_context->fp);
-	if (sig_size == ERR_UNRECOGNISED_SIG) {
+	if (sig_size < SIGTYPE_MIN) {
 		printf("[!] The TMD signature could not be recognised\n");
-		return ERR_UNRECOGNISED_SIG;
+		return sig_size;
 	}
 
-	tmd_struct = get_tmd_struct(sig_size, tmd_context->fp);
-	tmd_context->content_count = u8_to_u16(tmd_struct.content_count, BE);
-	tmd_context->title_version = u8_to_u16(tmd_struct.title_version, BE);
+	if (fseek(tmd_context->fp, 4 + sig_size, SEEK_SET))
+		return errno;
+	if (fread(&tmd_struct, sizeof(tmd_struct), 1, tmd_context->fp))
+		return errno;
+
+	tmd_context->content_count = be16toh(tmd_struct.content_count);
+	tmd_context->title_version = be16toh(tmd_struct.title_version);
 	tmd_context->size = 4 + sig_size + sizeof(TMD_STRUCT) + sizeof(TMD_CONTENT) * tmd_context->content_count;
 
-	tmd_context->cert.offset[0] = tmd_context->size;
-	tmd_context->cert.size[0] = get_cert_size(tmd_context->size, tmd_context->fp);
-	tmd_context->cert.offset[1] = tmd_context->size + tmd_context->cert.size[0];
-	tmd_context->cert.size[1] = get_cert_size(tmd_context->cert.offset[1], tmd_context->fp);
+	tmd_context->cert[0].offset = tmd_context->size;
+	tmd_context->cert[0].size = get_cert_size(tmd_context->cert[0].offset, tmd_context->fp);
+	if (tmd_context->cert[0].size < SIGTYPE_MIN) {
+		printf("[!] The first signatures in the TMD 'Cert Chain' is unrecognised.\n");
+		return tmd_context->cert[0].size;
+	}
 
-	if (tmd_context->cert.size[0] == ERR_UNRECOGNISED_SIG || tmd_context->cert.size[1] == ERR_UNRECOGNISED_SIG) {
+	tmd_context->cert[1].offset = tmd_context->cert[0].offset + tmd_context->cert[0].size;
+	tmd_context->cert[1].size = get_cert_size(tmd_context->cert[1].offset, tmd_context->fp);
+	if (tmd_context->cert[1].size < SIGTYPE_MIN) {
 		printf("[!] One or both of the signatures in the TMD 'Cert Chain' are unrecognised\n");
-		return ERR_UNRECOGNISED_SIG;
+		return tmd_context->cert[1].size;
 	}
 	tmd_context->title_id = tmd_struct.title_id;
 	tmd_context->content = malloc(sizeof(TMD_CONTENT) * tmd_context->content_count);
-	fseek(tmd_context->fp, 4 + sig_size + sizeof(TMD_STRUCT), SEEK_SET);
-	fread(tmd_context->content, sizeof(TMD_CONTENT), tmd_context->content_count, tmd_context->fp);
+	if (fseek(tmd_context->fp, 4 + sig_size + sizeof(TMD_STRUCT), SEEK_SET))
+		return errno;
+	if (fread(tmd_context->content, sizeof(TMD_CONTENT), tmd_context->content_count, tmd_context->fp) < tmd_context->content_count)
+		return errno;
 
 
 	return 0;
