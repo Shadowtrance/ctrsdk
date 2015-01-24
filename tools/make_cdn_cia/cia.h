@@ -20,6 +20,8 @@
 
 #include <stdio.h>
 
+#define ALIGN_CIA(v) ((v) & 0x3F ? (v) & ~0x3F + 0x40 : (v))
+
 enum {
 	SIGTYPE_RSA4096_SHA1 = 0x10000,
 	SIGTYPE_RSA2048_SHA1 = 0x10001,

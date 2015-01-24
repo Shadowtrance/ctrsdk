@@ -130,7 +130,7 @@ static int write_cert_chain(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd, FILE
 	if (tmd == NULL || tik == NULL || fp == NULL)
 		return -1;
 
-	if (fseek(fp, align_value(sizeof(CIA_HEADER), 64), SEEK_SET))
+	if (fseek(fp, ALIGN_CIA(sizeof(CIA_HEADER)), SEEK_SET))
 		return -1;
 
 	if (fseek(tik->fp, tik->cert[1].offset, SEEK_SET))
@@ -165,8 +165,8 @@ static int write_tik(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd, FILE *fp)
 		return -1;
 
 	if (fseek(fp,
-		align_value(get_total_cert_size(tik, tmd), 64)
-			+ align_value(sizeof(CIA_HEADER), 64),
+		ALIGN_CIA(get_total_cert_size(tik, tmd))
+			+ ALIGN_CIA(sizeof(CIA_HEADER)),
 		SEEK_SET))
 		return -1;
 	if (fseek(tik->fp, 0, SEEK_SET))
@@ -187,9 +187,9 @@ static int write_tmd(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd, FILE *fp)
 		return -1;
 
 	if (fseek(fp,
-		align_value(tik->size, 64)
-			+ align_value(get_total_cert_size(tik, tmd), 64)
-			+ align_value(sizeof(CIA_HEADER), 64),
+		ALIGN_CIA(tik->size)
+			+ ALIGN_CIA(get_total_cert_size(tik, tmd))
+			+ ALIGN_CIA(sizeof(CIA_HEADER)),
 		SEEK_SET))
 		return -1;
 	if (fseek(tmd->fp, 0, SEEK_SET))
@@ -213,10 +213,10 @@ static int write_content(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd, FILE *f
 		return -1;
 
 	if (fseek(fp,
-		align_value(tmd->size, 64)
-			+ align_value(tik->size, 64)
-			+ align_value(get_total_cert_size(tik, tmd), 64)
-			+ align_value(sizeof(CIA_HEADER), 64),
+		ALIGN_CIA(tmd->size)
+			+ ALIGN_CIA(tik->size)
+			+ ALIGN_CIA(get_total_cert_size(tik, tmd))
+			+ ALIGN_CIA(sizeof(CIA_HEADER)),
 		SEEK_SET))
 		return -1;
 
