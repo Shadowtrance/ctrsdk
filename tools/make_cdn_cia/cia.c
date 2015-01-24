@@ -31,9 +31,9 @@ static size_t get_sig_size(long offset, FILE *fp)
 	uint32_t sig_type;
 
 	if (fseek(fp, offset, SEEK_SET))
-		return errno;
+		return 0;
 	if (fread(&sig_type, sizeof(sig_type), 1, fp) <= 0)
-		return errno;
+		return 0;
 
 	switch (be32toh(sig_type)) {
 		case SIGTYPE_RSA4096_SHA1:
@@ -49,7 +49,8 @@ static size_t get_sig_size(long offset, FILE *fp)
 			return 60;
 
 		default:
-			return EILSEQ;
+			errno = EILSEQ;
+			return 0;
 	}
 }
 
@@ -58,9 +59,9 @@ static size_t get_cert_size(long offset, FILE *fp)
 	uint32_t sig_type;
 
 	if (fseek(fp, offset, SEEK_SET))
-		return errno;
+		return 0;
 	if (fread(&sig_type, sizeof(sig_type), 1, fp) <= 0)
-		return errno;
+		return 0;
 
 	switch (be32toh(sig_type)) {
 		case SIGTYPE_RSA4096_SHA1:
@@ -76,7 +77,8 @@ static size_t get_cert_size(long offset, FILE *fp)
 			return 140;
 
 		default:
-			return EILSEQ;
+			errno = EILSEQ;
+			return 0;
 	}
 }
 
@@ -291,9 +293,9 @@ int process_tik(TIK_CONTEXT *tik_context)
 		return EFAULT;
 
 	sig_size = get_sig_size(0, tik_context->fp);
-	if (sig_size < SIGTYPE_MIN) {
+	if (!sig_size) {
 		printf("[!] The CETK signature could not be recognised\n");
-		return sig_size;
+		return errno;
 	}
 
 	if (fseek(tik_context->fp, 4 + sig_size, SEEK_SET))
@@ -306,16 +308,16 @@ int process_tik(TIK_CONTEXT *tik_context)
 
 	tik_context->cert[0].offset = tik_context->size;
 	tik_context->cert[0].size = get_cert_size(tik_context->cert[0].offset, tik_context->fp);
-	if (tik_context->cert[0].size < SIGTYPE_MIN) {
+	if (!tik_context->cert[0].size) {
 		printf("[!] The first signatures in the CETK 'Cert Chain' is unrecognised.\n");
-		return tik_context->cert[0].size;
+		return errno;
 	}
 
 	tik_context->cert[1].offset = tik_context->cert[0].offset + tik_context->cert[0].size;
 	tik_context->cert[1].size = get_cert_size(tik_context->cert[1].offset, tik_context->fp);
-	if (tik_context->cert[1].size < SIGTYPE_MIN) {
+	if (!tik_context->cert[1].size) {
 		printf("[!] The second signatures in the CETK 'Cert Chain' is unrecognised.\n");
-		return tik_context->cert[1].size;
+		return errno;
 	}
 	tik_context->title_id = tik_struct.title_id;
 
@@ -332,9 +334,9 @@ int process_tmd(TMD_CONTEXT *tmd_context)
 		return EFAULT;
 
 	sig_size = get_sig_size(0, tmd_context->fp);
-	if (sig_size < SIGTYPE_MIN) {
+	if (!sig_size) {
 		printf("[!] The TMD signature could not be recognised\n");
-		return sig_size;
+		return errno;
 	}
 
 	if (fseek(tmd_context->fp, 4 + sig_size, SEEK_SET))
@@ -348,16 +350,16 @@ int process_tmd(TMD_CONTEXT *tmd_context)
 
 	tmd_context->cert[0].offset = tmd_context->size;
 	tmd_context->cert[0].size = get_cert_size(tmd_context->cert[0].offset, tmd_context->fp);
-	if (tmd_context->cert[0].size < SIGTYPE_MIN) {
+	if (!tmd_context->cert[0].size) {
 		printf("[!] The first signatures in the TMD 'Cert Chain' is unrecognised.\n");
-		return tmd_context->cert[0].size;
+		return errno;
 	}
 
 	tmd_context->cert[1].offset = tmd_context->cert[0].offset + tmd_context->cert[0].size;
 	tmd_context->cert[1].size = get_cert_size(tmd_context->cert[1].offset, tmd_context->fp);
-	if (tmd_context->cert[1].size < SIGTYPE_MIN) {
+	if (!tmd_context->cert[1].size) {
 		printf("[!] One or both of the signatures in the TMD 'Cert Chain' are unrecognised\n");
-		return tmd_context->cert[1].size;
+		return errno;
 	}
 	tmd_context->title_id = tmd_struct.title_id;
 	tmd_context->content = malloc(sizeof(TMD_CONTENT) * tmd_context->content_count);
