@@ -31,8 +31,6 @@ enum {
 	SIGTYPE_ECDSA_SHA256 = 0x10005
 };
 
-#define SIGTYPE_MIN SIGTYPE_RSA4096_SHA1
-
 typedef struct
 {
 	uint32_t offset;
