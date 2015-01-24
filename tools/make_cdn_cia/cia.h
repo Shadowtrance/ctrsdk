@@ -1,22 +1,24 @@
-/**
-Copyright 2013 3DSGuy
+/*
+ * Copyright 2013 3DSGuy
+ * Copyright 2015 173210
+ *
+ * This file is part of make_cdn_cia.
+ *
+ * make_cdn_cia is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
 
-This file is part of make_cdn_cia.
+ * make_cdn_cia is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
 
-make_cdn_cia is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+ * You should have received a copy of the GNU General Public License
+ * along with make_cdn_cia.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
-make_cdn_cia is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with make_cdn_cia.  If not, see <http://www.gnu.org/licenses/>.
-**/
-#include "lib.h"
+#include <stdio.h>
 
 enum {
 	SIGTYPE_RSA4096_SHA1 = 0x10000,
@@ -26,125 +28,109 @@ enum {
 	SIGTYPE_RSA2048_SHA256 = 0x10004,
 	SIGTYPE_ECDSA_SHA256 = 0x10005
 };
+
 #define SIGTYPE_MIN SIGTYPE_RSA4096_SHA1
 
 typedef struct
 {
-	u32 offset;
-	u32 size;
+	uint32_t offset;
+	uint32_t size;
 } cert_t;
 
 typedef struct
 {
-	u8 modulus[0x100];
-	u8 exponent[0x4];
-} RSA_2048_PUB_KEY;
-
-typedef struct
-{
-	u8 padding_0[0x3c];
-	u8 issuer[0x40];
-	u8 tag_0[4];
-	u8 name[0x40];
-	u8 tag_1[0x4];
-	RSA_2048_PUB_KEY pubk;
-	u8 padding_1[0x34];
-} CERT_2048KEY_DATA_STRUCT;
-
-typedef struct
-{
-	u8 padding_0[0x3c];
-	u8 issuer[0x40];
-	u8 version;
-	u8 ca_crl_version;
-	u8 signer_crl_version;
-	u8 padding_1;
+	uint8_t padding_0[0x3c];
+	uint8_t issuer[0x40];
+	uint8_t version;
+	uint8_t ca_crl_version;
+	uint8_t signer_crl_version;
+	uint8_t padding_1;
 } TMD_SIG_STRUCT;
 
 typedef struct
 {
 	uint32_t content_id;
 	uint16_t content_index;
-	u8 content_type[2];
+	uint8_t content_type[2];
 	uint64_t size;
-	u8 sha_256_hash[0x20];
+	uint8_t sha_256_hash[0x20];
 } TMD_CONTENT;
 
 typedef struct
 {
 	TMD_SIG_STRUCT tmd_sig;
-	u8 system_version[8];
-	u64 title_id;
-	u8 title_type[4];
-	u8 reserved[0x40];
-	u8 access_rights[4];
+	uint8_t system_version[8];
+	uint64_t title_id;
+	uint8_t title_type[4];
+	uint8_t reserved[0x40];
+	uint8_t access_rights[4];
 	uint16_t title_version;
 	uint16_t content_count;
-	u8 boot_content[2];
-	u8 padding[2];
-	u8 sha_256_hash[0x20];
-	u8 content_info_records[0x900];
+	uint8_t boot_content[2];
+	uint8_t padding[2];
+	uint8_t sha_256_hash[0x20];
+	uint8_t content_info_records[0x900];
 } TMD_STRUCT;
 
 typedef struct
 {
-	u8 padding_0[0x3c];
-	u8 issuer[0x40];
-	u8 ECDH[0x3c];
-	u8 unknown[3];
+	uint8_t padding_0[0x3c];
+	uint8_t issuer[0x40];
+	uint8_t ECDH[0x3c];
+	uint8_t unknown[3];
 } TIK_SIG_STRUCT;
 
 typedef struct
 {
 	TIK_SIG_STRUCT tik_sig;
-	u8 encrypted_title_key[0x10];
-	u8 unknown_0;
-	u8 ticket_id[8];
-	u8 ticket_consoleID[4];
-	u64 title_id;
-	u8 unknown_1[2];
+	uint8_t encrypted_title_key[0x10];
+	uint8_t unknown_0;
+	uint8_t ticket_id[8];
+	uint8_t ticket_consoleID[4];
+	uint64_t title_id;
+	uint8_t unknown_1[2];
 	uint16_t title_version;
-	u8 unused_0[8];
-	u8 unused_1;
-	u8 common_key_index;
-	u8 unknown_2[0x15e];
+	uint8_t unused_0[8];
+	uint8_t unused_1;
+	uint8_t common_key_index;
+	uint8_t unknown_2[0x15e];
 } TIK_STRUCT;
 
 typedef struct
 {
 	FILE *fp;
-	u64 title_id;
-	u16 title_version;
-	u32 size;
+	uint64_t title_id;
+	uint16_t title_version;
+	uint32_t size;
 	cert_t cert[2];
-	u16 content_count;
+	uint16_t content_count;
 	TMD_CONTENT *content;
 	
-	u16 *title_index;
+	uint16_t *title_index;
 } __attribute__((__packed__)) 
 TMD_CONTEXT;
 
 typedef struct
 {
 	FILE *fp;
-	u64 title_id;
-	u16 title_version;
-	u32 size;
+	uint64_t title_id;
+	uint16_t title_version;
+	uint32_t size;
 	cert_t cert[2];
 } __attribute__((__packed__)) 
 TIK_CONTEXT;
 
 typedef struct
 {
-	u32 header_size;
-	u16 type;
-	u16 version;
-	u32 cert_size;
-	u32 tik_size;
-	u32 tmd_size;
-	u32 meta_size;
-	u64 content_size;
-	u8 content_index[8192];
+	uint32_t header_size;
+	uint16_t type;
+	uint16_t version;
+	uint32_t cert_size;
+	uint32_t tik_size;
+	uint32_t tmd_size;
+	uint32_t meta_size;
+	uint64_t content_size;
+	uint8_t content_index[8192];
 } CIA_HEADER;
 
 int generate_cia(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp);

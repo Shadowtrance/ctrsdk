@@ -17,9 +17,14 @@
  * You should have received a copy of the GNU General Public License
  * along with make_cdn_cia.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 #include "cia.h"
+#include "lib.h"
+#include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 static size_t get_sig_size(long offset, FILE *fp)
 {
@@ -29,6 +34,7 @@ static size_t get_sig_size(long offset, FILE *fp)
 		return errno;
 	if (fread(&sig_type, sizeof(sig_type), 1, fp) <= 0)
 		return errno;
+
 	switch (be32toh(sig_type)) {
 		case SIGTYPE_RSA4096_SHA1:
 		case SIGTYPE_RSA4096_SHA256:
@@ -49,10 +55,29 @@ static size_t get_sig_size(long offset, FILE *fp)
 
 static size_t get_cert_size(long offset, FILE *fp)
 {
-	size_t sig_size;
+	uint32_t sig_type;
 
-	sig_size = get_sig_size(offset, fp);
-	return sig_size < SIGTYPE_MIN ? sig_size : 4 + sig_size + sizeof(CERT_2048KEY_DATA_STRUCT);
+	if (fseek(fp, offset, SEEK_SET))
+		return errno;
+	if (fread(&sig_type, sizeof(sig_type), 1, fp) <= 0)
+		return errno;
+
+	switch (be32toh(sig_type)) {
+		case SIGTYPE_RSA4096_SHA1:
+		case SIGTYPE_RSA4096_SHA256:
+			return 1220;
+
+		case SIGTYPE_RSA2048_SHA1:
+		case SIGTYPE_RSA2048_SHA256:
+			return 708;
+
+		case SIGTYPE_ECDSA_SHA1:
+		case SIGTYPE_ECDSA_SHA256:
+			return 140;
+
+		default:
+			return EILSEQ;
+	}
 }
 
 static size_t get_total_cert_size(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd)
@@ -98,41 +123,41 @@ static int write_cia_header(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd, FILE
 
 static int write_cert_chain(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd, FILE *fp)
 {
-	u8 cert[4096];
+	uint8_t cert[4096];
 
 	if (tmd == NULL || tik == NULL || fp == NULL)
 		return -1;
 
 	if (fseek(fp, align_value(sizeof(CIA_HEADER), 64), SEEK_SET))
-		return IO_FAIL;
+		return -1;
 
 	if (fseek(tik->fp, tik->cert[1].offset, SEEK_SET))
-		return IO_FAIL;
+		return -1;
 	if (fread(cert, tik->cert[1].size, 1, tik->fp) <= 0)
-		return IO_FAIL;
+		return -1;
 	if (fwrite(cert, tik->cert[1].size, 1, fp) <= 0)
-		return IO_FAIL;
+		return -1;
 
 	if (fseek(tik->fp, tik->cert[0].offset, SEEK_SET))
-		return IO_FAIL;
+		return -1;
 	if (fread(cert, tik->cert[0].size, 1, tik->fp) <= 0)
-		return IO_FAIL;
+		return -1;
 	if (fwrite(cert, tik->cert[0].size, 1, fp) <= 0)
-		return IO_FAIL;
+		return -1;
 
 	if (fseek(tmd->fp, tmd->cert[0].offset, SEEK_SET))
-		return IO_FAIL;
+		return -1;
 	if (fread(cert, tmd->cert[0].size, 1, tmd->fp) <= 0)
-		return IO_FAIL;
+		return -1;
 	if (fwrite(&cert, tmd->cert[0].size, 1, fp) <= 0)
-		return IO_FAIL;
+		return -1;
 	
 	return 0;
 }
 
 static int write_tik(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd, FILE *fp)
 {
-	u8 buf[tik->size];
+	uint8_t buf[tik->size];
 
 	if (tmd == NULL || tik == NULL || fp == NULL)
 		return -1;
@@ -141,20 +166,20 @@ static int write_tik(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd, FILE *fp)
 		align_value(get_total_cert_size(tik, tmd), 64)
 			+ align_value(sizeof(CIA_HEADER), 64),
 		SEEK_SET))
-		return IO_FAIL;
+		return -1;
 	if (fseek(tik->fp, 0, SEEK_SET))
-		return IO_FAIL;
+		return -1;
 	if (fread(buf, tik->size, 1, tik->fp) <= 0)
-		return IO_FAIL;
+		return -1;
 	if (fwrite(buf, tik->size, 1, fp) <= 0)
-		return IO_FAIL;
+		return -1;
 
 	return 0;
 }
 
 static int write_tmd(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd, FILE *fp)
 {
-	u8 buf[tmd->size];
+	uint8_t buf[tmd->size];
 
 	if (tmd == NULL || tik == NULL || fp == NULL)
 		return -1;
@@ -164,13 +189,13 @@ static int write_tmd(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd, FILE *fp)
 			+ align_value(get_total_cert_size(tik, tmd), 64)
 			+ align_value(sizeof(CIA_HEADER), 64),
 		SEEK_SET))
-		return IO_FAIL;
+		return -1;
 	if (fseek(tmd->fp, 0, SEEK_SET))
-		return IO_FAIL;
+		return -1;
 	if (fread(buf, tmd->size, 1, tmd->fp) < 0)
-		return IO_FAIL;
+		return -1;
 	if (fwrite(buf, tmd->size, 1, fp) <= 0)
-		return IO_FAIL;
+		return -1;
 
 	return 0;
 }
@@ -191,7 +216,7 @@ static int write_content(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd, FILE *f
 			+ align_value(get_total_cert_size(tik, tmd), 64)
 			+ align_value(sizeof(CIA_HEADER), 64),
 		SEEK_SET))
-		return IO_FAIL;
+		return -1;
 
 	for (i = 0; i < tmd->content_count; i++) {
 		sprintf(buf, "%08x", be32toh(tmd->content[i].content_id));
@@ -201,7 +226,7 @@ static int write_content(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd, FILE *f
 #ifdef _WIN32
 			sprintf(buf, "[!] Content %08x", be32toh(tmd->content[i].content_id));
 			perror(buf);
-			return IO_FAIL;
+			return -1;
 #else
 			for (i = 0; i < 16; i++)
 				if (islower(((unsigned char *)buf)[i]))
@@ -211,20 +236,20 @@ static int write_content(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd, FILE *f
 			if (content == NULL) {
 				sprintf(buf, "[!] Content %08x", be32toh(tmd->content[i].content_id));
 				perror(buf);
-				return IO_FAIL;
+				return -1;
 			}
 #endif
 		}
 		for (left = be64toh(tmd->content[i].size); left > sizeof(buf); left -= sizeof(buf)) {
 			if (fread(buf, sizeof(buf), 1, content) <= 0)
-				return IO_FAIL;
+				return -1;
 			if (fwrite(buf, sizeof(buf), 1, fp) <= 0)
-				return IO_FAIL;
+				return -1;
 		}
 		if (fread(buf, left, 1, content) <= 0)
-			return IO_FAIL;
+			return -1;
 		if (fwrite(buf, left, 1, fp) <= 0)
-			return IO_FAIL;
+			return -1;
 		fclose(content);
 	}
 
@@ -252,7 +277,7 @@ int generate_cia(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp)
 		return ret;
 
 	if (fclose(fp))
-		return IO_FAIL;
+		return -1;
 
 	return 0;
 }
