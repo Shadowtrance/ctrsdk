@@ -1,125 +1,97 @@
-/**
-Copyright 2013 3DSGuy
+/*
+ * Copyright (C) 2013 3DSGuy
+ * Copyright (C) 2015 173210
+ *
+ * This file is part of make_cdn_cia.
+ *
+ * make_cdn_cia is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
 
-This file is part of make_cdn_cia.
+ * make_cdn_cia is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
 
-make_cdn_cia is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-make_cdn_cia is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with make_cdn_cia.  If not, see <http://www.gnu.org/licenses/>.
-**/
+ * You should have received a copy of the GNU General Public License
+ * along with make_cdn_cia.  If not, see <http://www.gnu.org/licenses/>.
+ */
 #include "lib.h"
 #include "cia.h"
+#include <endian.h>
+#include <errno.h>
 
-//Version
-#define MAJOR 1
-#define MINOR 00
-
-void app_title(void);
-void help(u8 *app_name);
+#define VER "1.00"
 
 int main(int argc, char *argv[])
 {
-	app_title();
-	
-	//Argument Checks
-	if(argc < 3){
-		printf("[!] Not Enough Arguments\n");
-		help(argv[0]);
-		return 1;
+	TIK_CONTEXT tik;
+	TMD_CONTEXT tmd;
+	FILE *out;
+
+	if(argc != 3) {
+		printf("CTR_Toolkit - CIA Generator for CDN Content\n"
+			"Version " VER " (C) 3DSGuy 2013\n\n"
+			"Usage: %s <CDN Content Dir> <output CIA file>\n",
+			argv[0]);
+		return EINVAL;
 	}
-	if(argc > 3){
-		printf("[!] Too Many Arguments\n");
-		help(argv[0]);
-		return 1;
+
+	out = fopen(argv[2],"wb");
+	if (out == NULL) {
+		perror("[!] output");
+		return errno;
 	}
-	
-	//Storing Current Working Directory
-	char cwd[1024];
-	if (getcwdir(cwd, sizeof(cwd)) == NULL){
-		printf("[!] Could not store Current Working Directory\n");
-		return IO_FAIL;
+
+	if (chdir(argv[1])) {
+		perror("[!] input");
+		return errno;
 	}
-	
-	//Changing to CDN Content Directory
-	chdir(argv[1]);
-	
-	//Processing TIK
-	FILE *tik = fopen("cetk","rb");
-	if(tik == NULL){
-		printf("[!] Could not open 'tik'\n");
-		return IO_FAIL;
+
+	tik.fp = fopen("cetk","rb");
+	if (tik.fp == NULL) {
+		perror("[!] cetk");
+		return errno;
 	}
-	TIK_CONTEXT tik_context = process_tik(tik);
-	
-	//Processing TMD
-	FILE *tmd = fopen("tmd","rb");
-	if(tmd == NULL){
-		printf("[!] Could not open 'tmd'\n");
-		return IO_FAIL;
+	if (process_tik(&tik)) {
+		fclose(tik.fp);
+		return -1;
 	}
-	TMD_CONTEXT tmd_context = process_tmd(tmd);
-	
-	//Error Checking
-	if(tik_context.result != 0 || tmd_context.result != 0){
-		printf("[!] Input files could not be processed successfully\n");
-		free(tmd_context.content);
-		fclose(tik);
-		fclose(tmd);
-		return FILE_PROCESS_FAIL;
+
+	tmd.fp = fopen("tmd","rb");
+	if (tmd.fp == NULL) {
+		perror("[!] tmd");
+		fclose(out);
+		fclose(tik.fp);
+		return errno;
 	}
-	//TID comparison check
-	if(check_tid(tik_context.title_id,tmd_context.title_id) != True){
-		printf("[!] Caution, Ticket and TMD Title IDs do not match\n");
-		printf("[!] CETK Title ID:  "); u8_hex_print_be(tik_context.title_id,0x8); printf("\n");
-		printf("[!] TMD Title ID:   "); u8_hex_print_be(tmd_context.title_id,0x8); printf("\n");
+	if (process_tmd(&tmd)) {
+		fclose(out);
+		fclose(tik.fp);
+		fclose(tmd.fp);
+		return -1;
 	}
-	//Title Version comparison
-	if(tik_context.title_version != tmd_context.title_version){
-		printf("[!] Caution, Ticket and TMD Title Versions do not match\n");
-		printf("[!] CETK Title Ver: %d\n",tik_context.title_version);
-		printf("[!] TMD Title Ver:  %d\n",tmd_context.title_version);
+
+	if (tik.title_id != tmd.title_id) {
+		printf("[!] Caution, Ticket and TMD Title IDs do not match\n"
+			"[!] CETK Title ID: 0x%016jX\n"
+			"[!] TMD Title ID:  0x%016jX\n",
+			be64toh(tik.title_id), be64toh(tmd.title_id));
 	}
-	
-	//Returning to Original Working Directory
-	chdir(cwd);
-	
-	//Opening Output file
-	FILE *output = fopen(argv[2],"wb");
-	if(output == NULL){
-		printf("[!] Could not create '%s'\n",argv[2]);
-		return IO_FAIL;
+	if (tik.title_version != tmd.title_version) {
+		printf("[!] Caution, Ticket and TMD Title Versions do not match\n"
+			"[!] CETK Title Ver: %d\n"
+			"[!] TMD Title Ver:  %d\n",
+			tik.title_version, tmd.title_version);
 	}
 	
-	int result = generate_cia(&tmd_context, &tik_context, output);
-	if(result != 0){
-		printf("[!] Failed to Generate %s\n",argv[2]);
-		remove(argv[2]);
+	if (generate_cia(&tmd, &tik, out)) {
+		fclose(out);
+		fclose(tik.fp);
+		fclose(tmd.fp);
+		return -1;
 	}
-	else
-		printf("[*] %s Generated Sucessfully\n",argv[2]);
-	fclose(tik);
-	fclose(tmd);
-	free(tmd_context.content);
 	
 	return 0;
-}
-
-void app_title(void)
-{
-	printf("CTR_Toolkit - CIA Generator for CDN Content\n");
-	printf("Version %d.%d (C) 3DSGuy 2013\n\n",MAJOR,MINOR);
-}
-
-void help(u8 *app_name)
-{
-	printf("\nUsage: %s <CDN Content Dir> <output CIA file>\n", app_name);
 }

@@ -293,92 +293,70 @@ int generate_cia(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp)
 	return 0;
 }
 
-TIK_CONTEXT process_tik(FILE *fp)
+int process_tik(TIK_CONTEXT *tik_context)
 {
-	TIK_CONTEXT tik_context;
 	TIK_STRUCT tik_struct;
 	u32 sig_size;
 
-	tik_context.result = 0;
-	tik_context.fp = fp;
-	
-	sig_size = get_sig_size(0, fp);
+	sig_size = get_sig_size(0, tik_context->fp);
 	if (sig_size == ERR_UNRECOGNISED_SIG) {
 		printf("[!] The CETK signature could not be recognised\n");
-		tik_context.result = ERR_UNRECOGNISED_SIG;
-		return tik_context;
+		return ERR_UNRECOGNISED_SIG;
 	}
-	
-	tik_struct = get_tik_struct(sig_size, fp);
-	tik_context.size = 4 + sig_size + sizeof(TIK_STRUCT);
-	tik_context.title_version = u8_to_u16(tik_struct.title_version, BE);
-	
-	tik_context.cert.offset[0] = tik_context.size;
-	tik_context.cert.size[0] = get_cert_size(tik_context.size, fp);
-	tik_context.cert.offset[1] = tik_context.size + tik_context.cert.size[0];
-	tik_context.cert.size[1] = get_cert_size(tik_context.cert.offset[1], fp);
-	
-	if(tik_context.cert.size[0] == ERR_UNRECOGNISED_SIG || tik_context.cert.size[1] == ERR_UNRECOGNISED_SIG){
+
+	tik_struct = get_tik_struct(sig_size, tik_context->fp);
+	tik_context->title_version = u8_to_u16(tik_struct.title_version, BE);
+	tik_context->size = 4 + sig_size + sizeof(TIK_STRUCT);
+
+	if (tik_context->size == ERR_UNRECOGNISED_SIG) {
+		return ERR_UNRECOGNISED_SIG;
+	}
+
+	tik_context->cert.offset[0] = tik_context->size;
+	tik_context->cert.size[0] = get_cert_size(tik_context->size, tik_context->fp);
+	tik_context->cert.offset[1] = tik_context->size + tik_context->cert.size[0];
+	tik_context->cert.size[1] = get_cert_size(tik_context->cert.offset[1], tik_context->fp);
+
+	if (tik_context->cert.size[0] == ERR_UNRECOGNISED_SIG || tik_context->cert.size[1] == ERR_UNRECOGNISED_SIG) {
 		printf("[!] One or both of the signatures in the CETK 'Cert Chain' are unrecognised\n");
-		tik_context.result = ERR_UNRECOGNISED_SIG;
-		return tik_context;
+		return ERR_UNRECOGNISED_SIG;
 	}
-	memcpy(tik_context.title_id, tik_struct.title_id, 8);
-	
-	//printf("[+] CETK Title ID: "); u8_hex_print_be(tik_context.title_id,0x8); printf("\n");
-	//printf("[+] CETK Size:     0x%x\n",tik_context.tik_size);
-	//printf("[+] CERT Size:     0x%x\n",tik_context.cert.size);
-	
-	return tik_context;
+	tik_context->title_id = tik_struct.title_id;
+
+	return 0;
 }
 
-TMD_CONTEXT process_tmd(FILE *fp)
+int process_tmd(TMD_CONTEXT *tmd_context)
 {
-	TMD_CONTEXT tmd_context;
 	TMD_STRUCT tmd_struct;
 	u32 sig_size;
 	int i;
 
-	tmd_context.result = 0;
-	tmd_context.fp = fp;
-	
-	sig_size = get_sig_size(0, fp);
+	sig_size = get_sig_size(0, tmd_context->fp);
 	if (sig_size == ERR_UNRECOGNISED_SIG) {
 		printf("[!] The TMD signature could not be recognised\n");
-		tmd_context.result = ERR_UNRECOGNISED_SIG;
-		return tmd_context;
+		return ERR_UNRECOGNISED_SIG;
 	}
-	
-	
-	tmd_struct = get_tmd_struct(sig_size, fp);
-	tmd_context.content_count = u8_to_u16(tmd_struct.content_count, BE);
-	tmd_context.size = 4 + sig_size + sizeof(TMD_STRUCT) + sizeof(TMD_CONTENT) * tmd_context.content_count;
-	tmd_context.title_version = u8_to_u16(tmd_struct.title_version, BE);
-	
-	tmd_context.cert.offset[0] = tmd_context.size;
-	tmd_context.cert.size[0] = get_cert_size(tmd_context.size, fp);
-	tmd_context.cert.offset[1] = tmd_context.size + tmd_context.cert.size[0];
-	tmd_context.cert.size[1] = get_cert_size(tmd_context.cert.offset[1], fp);
-	
-	if (tmd_context.cert.size[0] == ERR_UNRECOGNISED_SIG || tmd_context.cert.size[1] == ERR_UNRECOGNISED_SIG) {
+
+	tmd_struct = get_tmd_struct(sig_size, tmd_context->fp);
+	tmd_context->content_count = u8_to_u16(tmd_struct.content_count, BE);
+	tmd_context->title_version = u8_to_u16(tmd_struct.title_version, BE);
+	tmd_context->size = 4 + sig_size + sizeof(TMD_STRUCT) + sizeof(TMD_CONTENT) * tmd_context->content_count;
+
+	tmd_context->cert.offset[0] = tmd_context->size;
+	tmd_context->cert.size[0] = get_cert_size(tmd_context->size, tmd_context->fp);
+	tmd_context->cert.offset[1] = tmd_context->size + tmd_context->cert.size[0];
+	tmd_context->cert.size[1] = get_cert_size(tmd_context->cert.offset[1], tmd_context->fp);
+
+	if (tmd_context->cert.size[0] == ERR_UNRECOGNISED_SIG || tmd_context->cert.size[1] == ERR_UNRECOGNISED_SIG) {
 		printf("[!] One or both of the signatures in the TMD 'Cert Chain' are unrecognised\n");
-		tmd_context.result = ERR_UNRECOGNISED_SIG;
-		return tmd_context;
+		return ERR_UNRECOGNISED_SIG;
 	}
-	memcpy(tmd_context.title_id, tmd_struct.title_id, 8);
-	
-	tmd_context.content = malloc(sizeof(TMD_CONTENT) * tmd_context.content_count);
-	fseek(fp, 4 + sig_size + sizeof(TMD_STRUCT), SEEK_SET);
-	fread(tmd_context.content,sizeof(content_struct), tmd_context.content_count, fp);
+	tmd_context->title_id = tmd_struct.title_id;
+	tmd_context->content = malloc(sizeof(TMD_CONTENT) * tmd_context->content_count);
+	fseek(tmd_context->fp, 4 + sig_size + sizeof(TMD_STRUCT), SEEK_SET);
+	fread(tmd_context->content, sizeof(TMD_CONTENT), tmd_context->content_count, tmd_context->fp);
 
-	return tmd_context;
-}
 
-int check_tid(const u8 *tid0, const u8 *tid1)
-{
-	for (int i = 0; i < 8; i++) {
-		if (tid0[i] != tid1[i])
-			return False;
-	}
-	return True;
+	return 0;
 }

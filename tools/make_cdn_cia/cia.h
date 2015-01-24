@@ -72,7 +72,7 @@ typedef struct
 {
 	TMD_SIG_STRUCT tmd_sig;
 	u8 system_version[8];
-	u8 title_id[8];
+	u64 title_id;
 	u8 title_type[4];
 	u8 reserved[0x40];
 	u8 access_rights[4];
@@ -99,7 +99,7 @@ typedef struct
 	u8 unknown_0;
 	u8 ticket_id[8];
 	u8 ticket_consoleID[4];
-	u8 title_id[8];
+	u64 title_id;
 	u8 unknown_1[2];
 	u8 title_version[2];
 	u8 unused_0[8];
@@ -110,10 +110,8 @@ typedef struct
 
 typedef struct
 {
-	u8 result;
-
 	FILE *fp;
-	u8 title_id[8];
+	u64 title_id;
 	u16 title_version;
 	u32 size;
 	cert_t cert;
@@ -126,10 +124,8 @@ TMD_CONTEXT;
 
 typedef struct
 {
-	u8 result;
-	
 	FILE *fp;
-	u8 title_id[8];
+	u64 title_id;
 	u16 title_version;
 	u32 size;
 	cert_t cert;
@@ -151,7 +147,5 @@ typedef struct
 
 int generate_cia(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp);
 
-TIK_CONTEXT process_tik(FILE *fp);
-TMD_CONTEXT process_tmd(FILE *fp);
-
-int check_tid(const u8 *tid0, const u8 *tid1);
+int process_tik(TIK_CONTEXT *tik_context);
+int process_tmd(TMD_CONTEXT *tmd_context);
