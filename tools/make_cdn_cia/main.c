@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
 
 	if(argc != 3) {
 		printf("CTR_Toolkit - CIA Generator for CDN Content\n"
-			"Version " VER " (C) 3DSGuy 2013\n\n"
+			"Version " VER " (C) 2013-2015 3DSGuy, 173210\n\n"
 			"Usage: %s <CDN Content Dir> <output CIA file>\n",
 			argv[0]);
 		return EINVAL;
@@ -40,18 +40,18 @@ int main(int argc, char *argv[])
 
 	out = fopen(argv[2],"wb");
 	if (out == NULL) {
-		perror("[!] output");
+		perror("CIA: error");
 		return errno;
 	}
 
 	if (chdir(argv[1])) {
-		perror("[!] input");
+		perror("CIA: error");
 		return errno;
 	}
 
 	tik.fp = fopen("cetk","rb");
 	if (tik.fp == NULL) {
-		perror("[!] cetk");
+		perror("CETK: error");
 		return errno;
 	}
 	if (process_tik(&tik)) {
@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
 
 	tmd.fp = fopen("tmd","rb");
 	if (tmd.fp == NULL) {
-		perror("[!] tmd");
+		perror("TMD: error");
 		fclose(out);
 		fclose(tik.fp);
 		return errno;
@@ -74,15 +74,15 @@ int main(int argc, char *argv[])
 	}
 
 	if (tik.title_id != tmd.title_id) {
-		printf("[!] Caution, Ticket and TMD Title IDs do not match\n"
-			"[!] CETK Title ID: 0x%016luX\n"
-			"[!] TMD Title ID:  0x%016luX\n",
+		printf("warning: CETK and TMD Title IDs do not match\n"
+			"       CETK Title ID: 0x%016luX\n"
+			"       TMD Title ID:  0x%016luX\n",
 			ctr64toh(tik.title_id), ctr64toh(tmd.title_id));
 	}
 	if (tik.title_version != tmd.title_version) {
-		printf("[!] Caution, Ticket and TMD Title Versions do not match\n"
-			"[!] CETK Title Ver: %d\n"
-			"[!] TMD Title Ver:  %d\n",
+		printf("warning: CETK and TMD Title Versions do not match\n"
+			"       CETK Title Ver: %d\n"
+			"       TMD Title Ver:  %d\n",
 			tik.title_version, tmd.title_version);
 	}
 	
