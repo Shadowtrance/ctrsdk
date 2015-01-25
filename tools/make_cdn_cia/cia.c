@@ -292,8 +292,7 @@ int processTIK(TIKCtx *TIKCtx)
 	}
 
 	TIKCtx->size += sizeof(TIKHdr);
-	TIKCtx->titleId = TIKHdr.titleId;
-	TIKCtx->titleVer = be16toh(TIKHdr.titleVer);
+	TIKCtx->titleID = TIKHdr.titleID;
 
 	TIKCtx->xsCert.offset = TIKCtx->size;
 	if (fread(&sigType, sizeof(sigType), 1, TIKCtx->fp) <= 0) {
@@ -354,8 +353,7 @@ int processTMD(TMDCtx *TMDCtx)
 	}
 
 	TMDCtx->size += sizeof(TMDHdr);
-	TMDCtx->titleId = TMDHdr.titleId;
-	TMDCtx->titleVer = be16toh(TMDHdr.titleVer);
+	TMDCtx->titleID = TMDHdr.titleID;
 
 	TMDCtx->contentCnt = be16toh(TMDHdr.contentCnt);
 	TMDCtx->size += sizeof(TMDContent) * TMDCtx->contentCnt;

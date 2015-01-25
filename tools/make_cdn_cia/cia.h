@@ -38,52 +38,38 @@ typedef struct
 
 typedef struct
 {
-	uint8_t pad[60];
 	uint8_t issuer[64];
-	uint8_t ECDH[60];
-	uint8_t unk0[3];
+	uint8_t eccPubKey[60];
+	uint8_t ver;
+	uint8_t caCrlVer;
+	uint8_t signerCrlVer;
 	uint8_t titleKey[16];
-	uint8_t unk1;
-	uint64_t ticketId;
-	uint32_t consoleID;
-	uint64_t titleId;
-	uint8_t unk2[2];
-	uint16_t titleVer;
-	uint8_t unk3[9];
-	uint8_t keyIndex;
-	uint8_t unk4[350];
+	uint8_t pad;
+	uint64_t id;
+	uint32_t devID;
+	uint64_t titleID;
+	uint8_t pad1[2];
+	uint16_t tikVer;
+	uint8_t pad2[8];
+	uint8_t licence;
+	uint8_t keyID;
+	uint8_t pad3[42];
+	uint32_t accID;
+	uint8_t pad4;
+	uint8_t audit;
+	uint8_t pad5[66];
+	uint8_t limits[64];
 } TIKHdr;
 
 typedef struct
 {
 	FILE *fp;
 	size_t size;
-	uint64_t titleId;
+	uint64_t titleID;
 	uint16_t titleVer;
 	cert_t xsCert;
 	cert_t caCert;
 } TIKCtx;
-
-typedef struct
-{
-	uint8_t pad0[60];
-	uint8_t issuer[64];
-	uint8_t ver;
-	uint8_t caCrlVer;
-	uint8_t signerCrlVer;
-	uint8_t pad1;
-	uint64_t sysVer;
-	uint64_t titleId;
-	uint32_t titleType;
-	uint8_t reserve[64];
-	uint32_t access;
-	uint16_t titleVer;
-	uint16_t contentCnt;
-	uint16_t bootContent;
-	uint8_t pad2[2];
-	uint8_t sha256[32];
-	uint8_t contentInfo[2304];
-} TMDHdr;
 
 typedef struct
 {
@@ -96,9 +82,41 @@ typedef struct
 
 typedef struct
 {
+	uint16_t indexOffset;
+	uint16_t commandCnt;
+	uint8_t sha256[0x20];
+} TMDContentInfo;
+
+typedef struct
+{
+	uint8_t issuer[64];
+	uint8_t ver;
+	uint8_t caCrlVer;
+	uint8_t signerCrlVer;
+	uint8_t pad0;
+	uint64_t sysVer;
+	uint64_t titleID;
+	uint32_t titleType;
+	uint16_t groupID;
+	uint32_t saveSize;
+	uint32_t privSaveSize;
+	uint8_t pad1[4];
+	uint8_t twlFlag;
+	uint8_t pad2[49];
+	uint32_t access;
+	uint16_t titleVersion;
+	uint16_t contentCnt;
+	uint16_t bootContent;
+	uint8_t pad3[2];
+	uint8_t infoRecordSHA256[32];
+	TMDContentInfo contentInfo[64];
+} TMDHdr;
+
+typedef struct
+{
 	FILE *fp;
 	size_t size;
-	uint64_t titleId;
+	uint64_t titleID;
 	uint16_t titleVer;
 	cert_t cpCert;
 	cert_t caCert;

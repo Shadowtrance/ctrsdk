@@ -79,12 +79,6 @@ int main(int argc, char *argv[])
 			"       TMD Title ID:  0x%016lluX\n",
 			be64toh(tik.titleId), be64toh(tmd.titleId));
 	}
-	if (tik.titleVer != tmd.titleVer) {
-		printf("warning: CETK and TMD Title Versions do not match\n"
-			"       CETK Title Version: %d\n"
-			"       TMD Title Version:  %d\n",
-			tik.titleVer, tmd.titleVer);
-	}
 	
 	if (writeCIA(&tmd, &tik, out)) {
 		fclose(out);
