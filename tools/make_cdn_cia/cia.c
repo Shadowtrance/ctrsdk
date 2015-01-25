@@ -78,22 +78,22 @@ static int buildCIAHdr(CIAHdr *cia, const TIKCtx *tik, const TMDCtx *tmd)
 		return -1;
 	}
 
-	cia->header_size = htole32(sizeof(*cia));
+	cia->hdrSize = htole32(sizeof(*cia));
 	cia->type = htole16(0);
-	cia->version = htole16(0);
-	cia->cert_size = htole32(tik->caCert.size + tik->xsCert.size + tmd->cpCert.size);
-	cia->tik_size = htole32(tik->size);
-	cia->tmd_size = htole32(tmd->size);
-	cia->meta_size = htole32(0);
-	cia->content_size = 0;
+	cia->ver = htole16(0);
+	cia->certSize = htole32(tik->caCert.size + tik->xsCert.size + tmd->cpCert.size);
+	cia->tikSize = htole32(tik->size);
+	cia->tmdSize = htole32(tmd->size);
+	cia->metaSize = htole32(0);
+	cia->contentSize = 0;
 	for (i = 0; i < tmd->contentCnt; i++)
-		cia->content_size += be64toh(tmd->content[i].size);
-	cia->content_size = htole64(cia->content_size);
+		cia->contentSize += be64toh(tmd->content[i].size);
+	cia->contentSize = htole64(cia->contentSize);
 
-	memset(cia->content_index, 0, sizeof(cia->content_index));
+	memset(cia->contentIndex, 0, sizeof(cia->contentIndex));
 	for (i = 0; i < tmd->contentCnt; i++) {
-		index = be16toh(tmd->content[i].content_index);
-		cia->content_index[index >> 3] |= 0x80 >> (index & 7);
+		index = be16toh(tmd->content[i].index);
+		cia->contentIndex[index >> 3] |= 0x80 >> (index & 7);
 	}
 
 	return 0;
@@ -164,7 +164,7 @@ int writeCIA(const TMDCtx *tmd, const TIKCtx *tik, FILE *fp)
 		return -1;
 	}
 
-	align = le32toh(cia.cert_size) & 0x3F;
+	align = le32toh(cia.certSize) & 0x3F;
 	if (align)
 		if (fseek(fp, 0x40 - align, SEEK_CUR)) {
 			perror("CIA: error");
@@ -212,12 +212,12 @@ int writeCIA(const TMDCtx *tmd, const TIKCtx *tik, FILE *fp)
 		}
 
 	for (i = 0; i < tmd->contentCnt; i++) {
-		sprintf(buf, "%08x", be32toh(tmd->content[i].content_id));
+		sprintf(buf, "%08x", be32toh(tmd->content[i].id));
 
 		content = fopen(buf, "rb");
 		if (content == NULL) {
 #ifdef _WIN32
-			sprintf(buf, "0x%08X: error", be32toh(tmd->content[i].content_id));
+			sprintf(buf, "0x%08X: error", be32toh(tmd->content[i].id));
 			perror(buf);
 			return -1;
 #else
@@ -227,7 +227,7 @@ int writeCIA(const TMDCtx *tmd, const TIKCtx *tik, FILE *fp)
 
 			content = fopen(buf, "rb");
 			if (content == NULL) {
-				sprintf(buf, "0x%08X: error", be32toh(tmd->content[i].content_id));
+				sprintf(buf, "0x%08X: error", be32toh(tmd->content[i].id));
 				perror(buf);
 				return -1;
 			}
@@ -235,7 +235,7 @@ int writeCIA(const TMDCtx *tmd, const TIKCtx *tik, FILE *fp)
 		}
 		for (left = be64toh(tmd->content[i].size); left > sizeof(buf); left -= sizeof(buf)) {
 			if (fread(buf, sizeof(buf), 1, content) <= 0) {
-				sprintf(buf, "0x%08X: error", be32toh(tmd->content[i].content_id));
+				sprintf(buf, "0x%08X: error", be32toh(tmd->content[i].id));
 				perror(buf);
 				return -1;
 			}
@@ -245,7 +245,7 @@ int writeCIA(const TMDCtx *tmd, const TIKCtx *tik, FILE *fp)
 			}
 		}
 		if (fread(buf, left, 1, content) <= 0) {
-			sprintf(buf, "0x%08X: error", be32toh(tmd->content[i].content_id));
+			sprintf(buf, "0x%08X: error", be32toh(tmd->content[i].id));
 			perror(buf);
 			return -1;
 		}
@@ -354,8 +354,8 @@ int processTMD(TMDCtx *TMDCtx)
 	}
 
 	TMDCtx->size += sizeof(TMDHdr);
-	TMDCtx->titleId = TMDHdr.title_id;
-	TMDCtx->titleVer = be16toh(TMDHdr.title_version);
+	TMDCtx->titleId = TMDHdr.titleId;
+	TMDCtx->titleVer = be16toh(TMDHdr.titleVer);
 
 	TMDCtx->contentCnt = be16toh(TMDHdr.contentCnt);
 	TMDCtx->size += sizeof(TMDContent) * TMDCtx->contentCnt;
