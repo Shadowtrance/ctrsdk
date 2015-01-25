@@ -67,93 +67,79 @@ static size_t get_cert_size(uint32_t sig_type)
 	}
 }
 
-static size_t get_total_cert_size(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd)
+static int build_cia_header(CIA_HEADER *cia, const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd)
 {
-	if (tmd == NULL || tik == NULL)
-		return EFAULT;
-
-	return tik->cert[1].size + tik->cert[0].size + tmd->cert[0].size;
-}
-
-static int write_cia_header(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd, FILE *fp)
-{
-	CIA_HEADER hdr;
 	uint16_t index, i;
 
-	if (tmd == NULL || tik == NULL || fp == NULL)
+	if (cia == NULL || tik == NULL || tmd == NULL)
 		return -1;
 
-	hdr.header_size = sizeof(hdr);
-	hdr.type = 0;
-	hdr.version = 0;
-	hdr.cert_size = get_total_cert_size(tik, tmd);
-	hdr.tik_size = tik->size;
-	hdr.tmd_size = tmd->size;
-	hdr.meta_size = 0;
-	hdr.content_size = 0;
+	cia->header_size = sizeof(*cia);
+	cia->type = 0;
+	cia->version = 0;
+	cia->cert_size = tik->cert[1].size + tik->cert[0].size + tmd->cert[0].size;
+	cia->tik_size = tik->size;
+	cia->tmd_size = tmd->size;
+	cia->meta_size = 0;
+	cia->content_size = 0;
 	for (i = 0; i < tmd->content_count; i++)
-		hdr.content_size += be64toh(tmd->content[i].size);
+		cia->content_size += be64toh(tmd->content[i].size);
 
-	memset(hdr.content_index, 0, sizeof(hdr.content_index));
+	memset(cia->content_index, 0, sizeof(cia->content_index));
 	for (i = 0; i < tmd->content_count; i++) {
 		index = ctr16toh(tmd->content[i].content_index);
-		hdr.content_index[index >> 3] |= 0x80 >> (index & 7);
+		cia->content_index[index >> 3] |= 0x80 >> (index & 7);
 	}
-
-	if (fseek(fp, 0, SEEK_SET))
-		return errno;
-	if (fwrite(&hdr, sizeof(hdr), 1, fp) <= 0)
-		return errno;
 
 	return 0;
 }
 
-static int write_cert_chain(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd, FILE *fp)
+int generate_cia(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp)
 {
-	uint8_t cert[4096];
+	CIA_HEADER cia;
+	FILE *content;
+	char buf[1220];
+	uint16_t i;
+	long align;
+	size_t left;
 
-	if (tmd == NULL || tik == NULL || fp == NULL)
-		return -1;
+	build_cia_header(&cia, tik, tmd);
+	if (fseek(fp, 0, SEEK_SET))
+		return errno;
+	if (fwrite(&cia, sizeof(cia), 1, fp) <= 0)
+		return errno;
 
-	if (fseek(fp, ALIGN_CIA(sizeof(CIA_HEADER)), SEEK_SET))
-		return -1;
+	align = sizeof(CIA_HEADER) & 0x3F;
+	if (align)
+		if (fseek(fp, 0x40 - align, SEEK_CUR))
+			return -1;
 
 	if (fseek(tik->fp, tik->cert[1].offset, SEEK_SET))
 		return -1;
-	if (fread(cert, tik->cert[1].size, 1, tik->fp) <= 0)
+	if (fread(buf, tik->cert[1].size, 1, tik->fp) <= 0)
 		return -1;
-	if (fwrite(cert, tik->cert[1].size, 1, fp) <= 0)
+	if (fwrite(buf, tik->cert[1].size, 1, fp) <= 0)
 		return -1;
 
 	if (fseek(tik->fp, tik->cert[0].offset, SEEK_SET))
 		return -1;
-	if (fread(cert, tik->cert[0].size, 1, tik->fp) <= 0)
+	if (fread(buf, tik->cert[0].size, 1, tik->fp) <= 0)
 		return -1;
-	if (fwrite(cert, tik->cert[0].size, 1, fp) <= 0)
+	if (fwrite(buf, tik->cert[0].size, 1, fp) <= 0)
 		return -1;
 
 	if (fseek(tmd->fp, tmd->cert[0].offset, SEEK_SET))
 		return -1;
-	if (fread(cert, tmd->cert[0].size, 1, tmd->fp) <= 0)
+	if (fread(buf, tmd->cert[0].size, 1, tmd->fp) <= 0)
 		return -1;
-	if (fwrite(&cert, tmd->cert[0].size, 1, fp) <= 0)
-		return -1;
-	
-	return 0;
-}
-
-static int write_tik(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd, FILE *fp)
-{
-	uint8_t buf[tik->size];
-
-	if (tmd == NULL || tik == NULL || fp == NULL)
+	if (fwrite(buf, tmd->cert[0].size, 1, fp) <= 0)
 		return -1;
 
-	if (fseek(fp,
-		ALIGN_CIA(get_total_cert_size(tik, tmd))
-			+ ALIGN_CIA(sizeof(CIA_HEADER)),
-		SEEK_SET))
-		return -1;
+	align = cia.cert_size & 0x3F;
+	if (align)
+		if (fseek(fp, 0x40 - align, SEEK_CUR))
+			return -1;
+
 	if (fseek(tik->fp, 0, SEEK_SET))
 		return -1;
 	if (fread(buf, tik->size, 1, tik->fp) <= 0)
@@ -161,22 +147,11 @@ static int write_tik(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd, FILE *fp)
 	if (fwrite(buf, tik->size, 1, fp) <= 0)
 		return -1;
 
-	return 0;
-}
+	align = tik->size & 0x3F;
+	if (align)
+		if (fseek(fp, 0x40 - align, SEEK_CUR))
+			return -1;
 
-static int write_tmd(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd, FILE *fp)
-{
-	uint8_t buf[tmd->size];
-
-	if (tmd == NULL || tik == NULL || fp == NULL)
-		return -1;
-
-	if (fseek(fp,
-		ALIGN_CIA(tik->size)
-			+ ALIGN_CIA(get_total_cert_size(tik, tmd))
-			+ ALIGN_CIA(sizeof(CIA_HEADER)),
-		SEEK_SET))
-		return -1;
 	if (fseek(tmd->fp, 0, SEEK_SET))
 		return -1;
 	if (fread(buf, tmd->size, 1, tmd->fp) < 0)
@@ -184,26 +159,10 @@ static int write_tmd(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd, FILE *fp)
 	if (fwrite(buf, tmd->size, 1, fp) <= 0)
 		return -1;
 
-	return 0;
-}
-
-static int write_content(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd, FILE *fp)
-{
-	FILE *content;
-	uint16_t i;
-	uint64_t left;
-	char buf[1048576];
-
-	if (tmd == NULL || tik == NULL || fp == NULL)
-		return -1;
-
-	if (fseek(fp,
-		ALIGN_CIA(tmd->size)
-			+ ALIGN_CIA(tik->size)
-			+ ALIGN_CIA(get_total_cert_size(tik, tmd))
-			+ ALIGN_CIA(sizeof(CIA_HEADER)),
-		SEEK_SET))
-		return -1;
+	align = tmd->size & 0x3F;
+	if (align)
+		if (fseek(fp, 0x40 - align, SEEK_CUR))
+			return -1;
 
 	for (i = 0; i < tmd->content_count; i++) {
 		sprintf(buf, "%08x", ctr32toh(tmd->content[i].content_id));
@@ -239,29 +198,6 @@ static int write_content(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd, FILE *f
 			return -1;
 		fclose(content);
 	}
-
-	return 0;
-}
-
-int generate_cia(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp)
-{
-	int ret;
-
-	ret = write_cia_header(tik, tmd, fp);
-	if (ret)
-		return ret;
-	ret = write_cert_chain(tik, tmd, fp);
-	if (ret)
-		return ret;
-	ret = write_tik(tik, tmd, fp);
-	if (ret)
-		return ret;
-	ret = write_tmd(tik, tmd, fp);
-	if (ret)
-		return ret;
-	ret = write_content(tik, tmd, fp);
-	if (ret)
-		return ret;
 
 	if (fclose(fp))
 		return -1;

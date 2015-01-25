@@ -20,8 +20,6 @@
 
 #include <stdio.h>
 
-#define ALIGN_CIA(v) ((v) & 0x3F ? ((v) & ~0x3F) + 0x40 : (v))
-
 #if __BYTE_ORDER__ ==  __ORDER_BIG_ENDIAN__ || BYTE_ORDER == BIG_ENDIAN
 #define htoctr16
 #define ctr16toh
