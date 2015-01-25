@@ -27,9 +27,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-static size_t getSigSize(uint32_t sig_type)
+static size_t getSigSize(uint32_t sigType)
 {
-	switch (sig_type) {
+	switch (sigType) {
 		case SIGTYPE_RSA4096_SHA1:
 		case SIGTYPE_RSA4096_SHA256:
 			return 516;
@@ -48,9 +48,9 @@ static size_t getSigSize(uint32_t sig_type)
 	}
 }
 
-static size_t getCertSize(uint32_t sig_type)
+static size_t getCertSize(uint32_t sigType)
 {
-	switch (be32toh(sig_type)) {
+	switch (be32toh(sigType)) {
 		case SIGTYPE_RSA4096_SHA1:
 		case SIGTYPE_RSA4096_SHA256:
 			return 1220;
