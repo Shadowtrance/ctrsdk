@@ -264,54 +264,54 @@ int writeCIA(const TMDCtx *tmd, const TIKCtx *tik, FILE *fp)
 	return 0;
 }
 
-int processTIK(TIKCtx *TIKCtx)
+int processTIK(TIKCtx *tik)
 {
-	TIKHdr TIKHdr;
+	TIKHdr hdr;
 	uint32_t sigType;
 
-	if (TIKCtx == NULL) {
+	if (tik == NULL) {
 		errno = EFAULT;
 		return -1;
 	}
 
-	if (fseek(TIKCtx->fp, 0, SEEK_SET))
+	if (fseek(tik->fp, 0, SEEK_SET))
 		return -1;
-	if (fread(&sigType, sizeof(sigType), 1, TIKCtx->fp) <= 0)
+	if (fread(&sigType, sizeof(sigType), 1, tik->fp) <= 0)
 		return -1;
-	TIKCtx->size = getSigSize(be32toh(sigType));
-	if (!TIKCtx->size) {
+	tik->size = getSigSize(be32toh(sigType));
+	if (!tik->size) {
 		printf("CETK: error: The signature could not be recognized.\n");
 		return -1;
 	}
 
-	if (fseek(TIKCtx->fp, TIKCtx->size, SEEK_SET))
+	if (fseek(tik->fp, tik->size, SEEK_SET))
 		return -1;
-	if (fread(&TIKHdr, sizeof(TIKHdr), 1, TIKCtx->fp) <= 0) {
+	if (fread(&hdr, sizeof(hdr), 1, tik->fp) <= 0) {
 		perror("CETK: error");
 		return -1;
 	}
 
-	TIKCtx->size += sizeof(TIKHdr);
-	TIKCtx->titleID = TIKHdr.titleID;
+	tik->size += sizeof(hdr);
+	tik->titleID = hdr.titleID;
 
-	TIKCtx->xsCert.offset = TIKCtx->size;
-	if (fread(&sigType, sizeof(sigType), 1, TIKCtx->fp) <= 0) {
+	tik->xsCert.offset = tik->size;
+	if (fread(&sigType, sizeof(sigType), 1, tik->fp) <= 0) {
 		perror("CETK: error");
 		return -1;
 	}
-	TIKCtx->xsCert.size = getCertSize(be32toh(sigType));
-	if (!TIKCtx->xsCert.size) {
+	tik->xsCert.size = getCertSize(be32toh(sigType));
+	if (!tik->xsCert.size) {
 		printf("CETK: error: xs certificate is unrecognized.\n");
 		return -1;
 	}
 
-	TIKCtx->caCert.offset = TIKCtx->xsCert.offset + TIKCtx->xsCert.size;
-	if (fseek(TIKCtx->fp, TIKCtx->caCert.offset, SEEK_SET))
+	tik->caCert.offset = tik->xsCert.offset + tik->xsCert.size;
+	if (fseek(tik->fp, tik->caCert.offset, SEEK_SET))
 		return -1;
-	if (fread(&sigType, sizeof(sigType), 1, TIKCtx->fp) <= 0)
+	if (fread(&sigType, sizeof(sigType), 1, tik->fp) <= 0)
 		return -1;
-	TIKCtx->caCert.size = getCertSize(be32toh(sigType));
-	if (!TIKCtx->caCert.size) {
+	tik->caCert.size = getCertSize(be32toh(sigType));
+	if (!tik->caCert.size) {
 		printf("CETK: error: ca certificate is unrecognized.\n");
 		return -1;
 	}
@@ -319,69 +319,69 @@ int processTIK(TIKCtx *TIKCtx)
 	return 0;
 }
 
-int processTMD(TMDCtx *TMDCtx)
+int processTMD(TMDCtx *tmd)
 {
-	TMDHdr TMDHdr;
+	TMDHdr hdr;
 	uint32_t sigType;
 
-	if (TMDCtx == NULL) {
+	if (tmd == NULL) {
 		errno = EFAULT;
 		return -1;
 	}
 
-	if (fseek(TMDCtx->fp, 0, SEEK_SET)) {
+	if (fseek(tmd->fp, 0, SEEK_SET)) {
 		perror("TMD: error");
 		return -1;
 	}
-	if (fread(&sigType, sizeof(sigType), 1, TMDCtx->fp) <= 0) {
+	if (fread(&sigType, sizeof(sigType), 1, tmd->fp) <= 0) {
 		perror("TMD: error");
 		return -1;
 	}
-	TMDCtx->size = getSigSize(be32toh(sigType));
-	if (!TMDCtx->size) {
+	tmd->size = getSigSize(be32toh(sigType));
+	if (!tmd->size) {
 		printf("TMD: error: The signature cannot be recognized.\n");
 		return -1;
 	}
 
-	if (fseek(TMDCtx->fp, TMDCtx->size, SEEK_SET)) {
+	if (fseek(tmd->fp, tmd->size, SEEK_SET)) {
 		perror("TMD: error");
 		return -1;
 	}
-	if (fread(&TMDHdr, sizeof(TMDHdr), 1, TMDCtx->fp)) {
+	if (fread(&hdr, sizeof(hdr), 1, tmd->fp)) {
 		perror("TMD: error");
 		return -1;
 	}
 
-	TMDCtx->size += sizeof(TMDHdr);
-	TMDCtx->titleID = TMDHdr.titleID;
+	tmd->size += sizeof(hdr);
+	tmd->titleID = hdr.titleID;
 
-	TMDCtx->contentCnt = be16toh(TMDHdr.contentCnt);
-	TMDCtx->size += sizeof(TMDContent) * TMDCtx->contentCnt;
-	TMDCtx->content = malloc(sizeof(TMDContent) * TMDCtx->contentCnt);
-	if (fread(TMDCtx->content, sizeof(TMDContent), TMDCtx->contentCnt, TMDCtx->fp)
-		< TMDCtx->contentCnt) {
+	tmd->contentCnt = be16toh(hdr.contentCnt);
+	tmd->size += sizeof(TMDContent) * tmd->contentCnt;
+	tmd->content = malloc(sizeof(TMDContent) * tmd->contentCnt);
+	if (fread(tmd->content, sizeof(TMDContent), tmd->contentCnt, tmd->fp)
+		< tmd->contentCnt) {
 		perror("content: error");
 		return -1;
 	}
 
-	TMDCtx->cpCert.offset = TMDCtx->size;
-	if (fread(&sigType, sizeof(sigType), 1, TMDCtx->fp) <= 0) {
+	tmd->cpCert.offset = tmd->size;
+	if (fread(&sigType, sizeof(sigType), 1, tmd->fp) <= 0) {
 		perror("TMD: error");
 		return -1;
 	}
-	TMDCtx->cpCert.size = getCertSize(be32toh(sigType));
-	if (!TMDCtx->cpCert.size) {
+	tmd->cpCert.size = getCertSize(be32toh(sigType));
+	if (!tmd->cpCert.size) {
 		printf("TMD: error: cp certificate is unrecognized.\n");
 		return -1;
 	}
 
-	TMDCtx->caCert.offset = TMDCtx->cpCert.offset + TMDCtx->cpCert.size;
-	if (fseek(TMDCtx->fp, TMDCtx->caCert.offset, SEEK_SET))
+	tmd->caCert.offset = tmd->cpCert.offset + tmd->cpCert.size;
+	if (fseek(tmd->fp, tmd->caCert.offset, SEEK_SET))
 		return -1;
-	if (fread(&sigType, sizeof(sigType), 1, TMDCtx->fp) <= 0)
+	if (fread(&sigType, sizeof(sigType), 1, tmd->fp) <= 0)
 		return -1;
-	TMDCtx->caCert.size = getCertSize(be32toh(sigType));
-	if (!TMDCtx->caCert.size) {
+	tmd->caCert.size = getCertSize(be32toh(sigType));
+	if (!tmd->caCert.size) {
 		printf("TMD: error: ca certificate is unrecognized.\n");
 		return -1;
 	}
