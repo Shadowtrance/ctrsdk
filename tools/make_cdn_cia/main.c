@@ -19,7 +19,6 @@
  */
 
 #include "cia.h"
-#include <endian.h>
 #include <errno.h>
 #include <unistd.h>
 
@@ -76,9 +75,9 @@ int main(int argc, char *argv[])
 
 	if (tik.title_id != tmd.title_id) {
 		printf("[!] Caution, Ticket and TMD Title IDs do not match\n"
-			"[!] CETK Title ID: 0x%016lluX\n"
-			"[!] TMD Title ID:  0x%016lluX\n",
-			be64toh(tik.title_id), be64toh(tmd.title_id));
+			"[!] CETK Title ID: 0x%016luX\n"
+			"[!] TMD Title ID:  0x%016luX\n",
+			ctr64toh(tik.title_id), ctr64toh(tmd.title_id));
 	}
 	if (tik.title_version != tmd.title_version) {
 		printf("[!] Caution, Ticket and TMD Title Versions do not match\n"

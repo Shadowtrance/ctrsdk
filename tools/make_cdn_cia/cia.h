@@ -20,7 +20,46 @@
 
 #include <stdio.h>
 
-#define ALIGN_CIA(v) ((v) & 0x3F ? (v) & ~0x3F + 0x40 : (v))
+#define ALIGN_CIA(v) ((v) & 0x3F ? ((v) & ~0x3F) + 0x40 : (v))
+
+#if __BYTE_ORDER__ ==  __ORDER_BIG_ENDIAN__ || BYTE_ORDER == BIG_ENDIAN
+#define htoctr16
+#define ctr16toh
+#define htoctr32
+#define ctr32toh
+#define htoctr64
+#define ctr64toh
+#elif __GNUC__ >= 4 && __GNUC_MINOR__ >= 4
+#if __GNUC_MINOR__ >= 8 || (defined(__powerpc__) && __GNUC_MINOR__ >= 6)
+#define htoctr16 __builtin_bswap16
+#define ctr16toh __builtin_bswap16
+#endif
+#define htoctr32 __builtin_bswap32
+#define ctr32toh __builtin_bswap32
+#define htoctr64 __builtin_bswap64
+#define ctr64toh __builtin_bswap64
+#elif __GNUC__ >= 5
+#define htoctr16 __builtin_bswap16
+#define ctr16toh __builtin_bswap16
+#define htoctr32 __builtin_bswap32
+#define ctr32toh __builtin_bswap32
+#define htoctr64 __builtin_bswap64
+#define ctr64toh __builtin_bswap64
+#elif defined(__INTEL_COMPILER)
+#define htoctr16(v) ((uint16_t)_bswap16((__int16)(v)))
+#define ctr16toh(v) ((uint16_t)_bswap16((__int16)(v)))
+#define htoctr32(v) ((uint32_t)_bswap((int)(v)))
+#define ctr32toh(v) ((uint32_t)_bswap((int)(v)))
+#define htoctr64(v) ((uint64_t)_bswap64((__int64)(v)))
+#define ctr64toh(v) ((uint64_t)_bswap64((__int64)(v)))
+#elif _MSC_VER >= 1400
+#define htoctr16(v) ((uint16_t)_byteswap_ushort((unsigned short)(v)))
+#define ctr16toh(v) ((uint16_t)_byteswap_ushort((unsigned short)(v)))
+#define htoctr32(v) ((uint32_t)_byteswap_ulong((unsigned long)(v)))
+#define ctr32toh(v) ((uint32_t)_byteswap_ulong((unsigned long)(v)))
+#define htoctr64(v) ((uint64_t)_byteswap_uint64((unsigned __int64)(v)))
+#define ctr64toh(v) ((uint64_t)_byteswap_uint64((unsigned __int64)(v)))
+#endif
 
 enum {
 	SIGTYPE_RSA4096_SHA1 = 0x10000,

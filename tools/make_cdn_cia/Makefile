@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -O2 -Wall -std=c11
+CFLAGS = -O2 -Wall
 TARGET = make_cdn_cia
 OBJS = main.o cia.o
 

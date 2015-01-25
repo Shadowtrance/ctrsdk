@@ -34,7 +34,7 @@ static size_t get_sig_size(long offset, FILE *fp)
 	if (fread(&sig_type, sizeof(sig_type), 1, fp) <= 0)
 		return 0;
 
-	switch (be32toh(sig_type)) {
+	switch (ctr32toh(sig_type)) {
 		case SIGTYPE_RSA4096_SHA1:
 		case SIGTYPE_RSA4096_SHA256:
 			return 512;
@@ -62,7 +62,7 @@ static size_t get_cert_size(long offset, FILE *fp)
 	if (fread(&sig_type, sizeof(sig_type), 1, fp) <= 0)
 		return 0;
 
-	switch (be32toh(sig_type)) {
+	switch (ctr32toh(sig_type)) {
 		case SIGTYPE_RSA4096_SHA1:
 		case SIGTYPE_RSA4096_SHA256:
 			return 1220;
@@ -110,7 +110,7 @@ static int write_cia_header(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd, FILE
 
 	memset(hdr.content_index, 0, sizeof(hdr.content_index));
 	for (i = 0; i < tmd->content_count; i++) {
-		index = be16toh(tmd->content[i].content_index);
+		index = ctr16toh(tmd->content[i].content_index);
 		hdr.content_index[index >> 3] |= 0x80 >> (index & 7);
 	}
 
@@ -220,12 +220,12 @@ static int write_content(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd, FILE *f
 		return -1;
 
 	for (i = 0; i < tmd->content_count; i++) {
-		sprintf(buf, "%08x", be32toh(tmd->content[i].content_id));
+		sprintf(buf, "%08x", ctr32toh(tmd->content[i].content_id));
 
 		content = fopen(buf, "rb");
 		if (content == NULL) {
 #ifdef _WIN32
-			sprintf(buf, "[!] Content %08x", be32toh(tmd->content[i].content_id));
+			sprintf(buf, "[!] Content %08x", ctr32toh(tmd->content[i].content_id));
 			perror(buf);
 			return -1;
 #else
@@ -235,7 +235,7 @@ static int write_content(const TIK_CONTEXT *tik, const TMD_CONTEXT *tmd, FILE *f
 
 			content = fopen(buf, "rb");
 			if (content == NULL) {
-				sprintf(buf, "[!] Content %08x", be32toh(tmd->content[i].content_id));
+				sprintf(buf, "[!] Content %08x", ctr32toh(tmd->content[i].content_id));
 				perror(buf);
 				return -1;
 			}
@@ -302,7 +302,7 @@ int process_tik(TIK_CONTEXT *tik_context)
 	if (fread(&tik_struct, sizeof(tik_struct), 1, tik_context->fp) <= 0)
 		return errno;
 
-	tik_context->title_version = be16toh(tik_struct.title_version);
+	tik_context->title_version = ctr16toh(tik_struct.title_version);
 	tik_context->size = 4 + sig_size + sizeof(TIK_STRUCT);
 
 	tik_context->cert[0].offset = tik_context->size;
@@ -327,7 +327,6 @@ int process_tmd(TMD_CONTEXT *tmd_context)
 {
 	TMD_STRUCT tmd_struct;
 	size_t sig_size;
-	int i;
 
 	if (tmd_context == NULL)
 		return EFAULT;
@@ -343,8 +342,8 @@ int process_tmd(TMD_CONTEXT *tmd_context)
 	if (fread(&tmd_struct, sizeof(tmd_struct), 1, tmd_context->fp))
 		return errno;
 
-	tmd_context->content_count = be16toh(tmd_struct.content_count);
-	tmd_context->title_version = be16toh(tmd_struct.title_version);
+	tmd_context->content_count = ctr16toh(tmd_struct.content_count);
+	tmd_context->title_version = ctr16toh(tmd_struct.title_version);
 	tmd_context->size = 4 + sig_size + sizeof(TMD_STRUCT) + sizeof(TMD_CONTENT) * tmd_context->content_count;
 
 	tmd_context->cert[0].offset = tmd_context->size;
