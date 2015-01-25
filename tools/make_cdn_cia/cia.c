@@ -30,15 +30,15 @@ static size_t get_sig_size(uint32_t sig_type)
 	switch (sig_type) {
 		case SIGTYPE_RSA4096_SHA1:
 		case SIGTYPE_RSA4096_SHA256:
-			return 512;
+			return 516;
 
 		case SIGTYPE_RSA2048_SHA1:
 		case SIGTYPE_RSA2048_SHA256:
-			return 256;
+			return 260;
 
 		case SIGTYPE_ECDSA_SHA1:
 		case SIGTYPE_ECDSA_SHA256:
-			return 60;
+			return 64;
 
 		default:
 			errno = EILSEQ;
@@ -71,8 +71,10 @@ static int build_cia_header(CIA_HEADER *cia, const TIK_CONTEXT *tik, const TMD_C
 {
 	uint16_t index, i;
 
-	if (cia == NULL || tik == NULL || tmd == NULL)
+	if (cia == NULL || tik == NULL || tmd == NULL) {
+		errno = EFAULT;
 		return -1;
+	}
 
 	cia->header_size = sizeof(*cia);
 	cia->type = 0;
@@ -105,9 +107,9 @@ int generate_cia(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp)
 
 	build_cia_header(&cia, tik, tmd);
 	if (fseek(fp, 0, SEEK_SET))
-		return errno;
+		return -1;
 	if (fwrite(&cia, sizeof(cia), 1, fp) <= 0)
-		return errno;
+		return -1;
 
 	align = sizeof(CIA_HEADER) & 0x3F;
 	if (align)
@@ -209,48 +211,48 @@ int process_tik(TIK_CONTEXT *tik_context)
 {
 	TIK_STRUCT tik_struct;
 	uint32_t sig_type;
-	size_t sig_size;
 
-	if (tik_context == NULL)
-		return EFAULT;
-
-	if (fseek(tik_context->fp, 0, SEEK_SET))
-		return errno;
-	if (fread(&sig_type, sizeof(sig_type), 1, tik_context->fp) <= 0)
-		return errno;
-	sig_size = get_sig_size(ctr32toh(sig_type));
-	if (!sig_size) {
-		printf("[!] The CETK signature could not be recognised\n");
-		return errno;
+	if (tik_context == NULL) {
+		errno = EFAULT;
+		return -1;
 	}
 
-	if (fseek(tik_context->fp, sig_size, SEEK_CUR))
-		return errno;
+	if (fseek(tik_context->fp, 0, SEEK_SET))
+		return -1;
+	if (fread(&sig_type, sizeof(sig_type), 1, tik_context->fp) <= 0)
+		return -1;
+	tik_context->sig_size = get_sig_size(ctr32toh(sig_type));
+	if (!tik_context->sig_size) {
+		printf("[!] The CETK signature could not be recognised\n");
+		return -1;
+	}
+
+	if (fseek(tik_context->fp, sig_size - 4, SEEK_CUR))
+		return -1;
 	if (fread(&tik_struct, sizeof(tik_struct), 1, tik_context->fp) <= 0)
-		return errno;
+		return -1;
 
 	tik_context->title_id = tik_struct.title_id;
 	tik_context->title_version = ctr16toh(tik_struct.title_version);
-	tik_context->size = 4 + sig_size + sizeof(TIK_STRUCT);
 
 	tik_context->cert[0].offset = tik_context->size;
 	if (fread(&sig_type, sizeof(sig_type), 1, tik_context->fp) <= 0)
-		return errno;
+		return -1;
 	tik_context->cert[0].size = get_cert_size(ctr32toh(sig_type));
 	if (!tik_context->cert[0].size) {
 		printf("[!] The first signatures in the CETK 'Cert Chain' is unrecognised.\n");
-		return errno;
+		return -1;
 	}
 
 	tik_context->cert[1].offset = tik_context->cert[0].offset + tik_context->cert[0].size;
 	if (fseek(tik_context->fp, tik_context->cert[0].size - 4, SEEK_SET))
-		return errno;
+		return -1;
 	if (fread(&sig_type, sizeof(sig_type), 1, tik_context->fp) <= 0)
-		return errno;
+		return -1;
 	tik_context->cert[1].size = get_cert_size(ctr32toh(sig_type));
 	if (!tik_context->cert[1].size) {
 		printf("[!] The second signatures in the CETK 'Cert Chain' is unrecognised.\n");
-		return errno;
+		return -1;
 	}
 
 	return 0;
@@ -260,54 +262,54 @@ int process_tmd(TMD_CONTEXT *tmd_context)
 {
 	TMD_STRUCT tmd_struct;
 	uint32_t sig_type;
-	size_t sig_size;
 
-	if (tmd_context == NULL)
-		return EFAULT;
-
-	if (fseek(tmd_context->fp, 0, SEEK_SET))
-		return errno;
-	if (fread(&sig_type, sizeof(sig_type), 1, tmd_context->fp) <= 0)
-		return errno;
-	sig_size = get_sig_size(ctr32toh(sig_type));
-	if (!sig_size) {
-		printf("[!] The TMD signature could not be recognised\n");
-		return errno;
+	if (tmd_context == NULL) {
+		errno = EFAULT;
+		return -1;
 	}
 
-	if (fseek(tmd_context->fp, sig_size, SEEK_CUR))
-		return errno;
+	if (fseek(tmd_context->fp, 0, SEEK_SET))
+		return -1;
+	if (fread(&sig_type, sizeof(sig_type), 1, tmd_context->fp) <= 0)
+		return -1;
+	tmd_context->sig_size = get_sig_size(ctr32toh(sig_type));
+	if (!tmd_context->sig_size) {
+		printf("[!] The TMD signature could not be recognised\n");
+		return -1;
+	}
+
+	if (fseek(tmd_context->fp, sig_size - 4, SEEK_CUR))
+		return -1;
 	if (fread(&tmd_struct, sizeof(tmd_struct), 1, tmd_context->fp))
-		return errno;
+		return -1;
 
 	tmd_context->title_id = tmd_struct.title_id;
 	tmd_context->title_version = ctr16toh(tmd_struct.title_version);
-	tmd_context->size = 4 + sig_size + sizeof(TMD_STRUCT) + sizeof(TMD_CONTENT) * tmd_context->content_count;
 
 	tmd_context->content_count = ctr16toh(tmd_struct.content_count);
 	tmd_context->content = malloc(sizeof(TMD_CONTENT) * tmd_context->content_count);
 	if (fread(tmd_context->content, sizeof(TMD_CONTENT), tmd_context->content_count, tmd_context->fp)
 		< tmd_context->content_count)
-		return errno;
+		return -1;
 
 	tmd_context->cert[0].offset = tmd_context->size;
 	if (fread(&sig_type, sizeof(sig_type), 1, tmd_context->fp) <= 0)
-		return errno;
+		return -1;
 	tmd_context->cert[0].size = get_cert_size(ctr32toh(sig_type));
 	if (!tmd_context->cert[0].size) {
 		printf("[!] The first signatures in the TMD 'Cert Chain' is unrecognised.\n");
-		return errno;
+		return -1;
 	}
 
 	tmd_context->cert[1].offset = tmd_context->cert[0].offset + tmd_context->cert[0].size;
 	if (fseek(tmd_context->fp, tmd_context->cert[0].size - 4, SEEK_SET))
-		return errno;
+		return -1;
 	if (fread(&sig_type, sizeof(sig_type), 1, tmd_context->fp) <= 0)
-		return errno;
+		return -1;
 	tmd_context->cert[1].size = get_cert_size(ctr32toh(sig_type));
 	if (!tmd_context->cert[1].size) {
 		printf("[!] One or both of the signatures in the TMD 'Cert Chain' are unrecognised\n");
-		return errno;
+		return -1;
 	}
 
 	return 0;

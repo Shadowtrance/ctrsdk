@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
 	}
 	if (process_tik(&tik)) {
 		fclose(tik.fp);
-		return -1;
+		return errno;
 	}
 
 	tmd.fp = fopen("tmd","rb");
@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
 		fclose(out);
 		fclose(tik.fp);
 		fclose(tmd.fp);
-		return -1;
+		return errno;
 	}
 
 	if (tik.title_id != tmd.title_id) {
@@ -90,7 +90,7 @@ int main(int argc, char *argv[])
 		fclose(out);
 		fclose(tik.fp);
 		fclose(tmd.fp);
-		return -1;
+		return errno;
 	}
 	
 	return 0;

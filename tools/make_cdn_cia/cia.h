@@ -136,9 +136,19 @@ typedef struct
 typedef struct
 {
 	FILE *fp;
+	uint32_t sig_ize;
 	uint64_t title_id;
 	uint16_t title_version;
-	uint32_t size;
+	cert_t cert[2];
+} __attribute__((__packed__)) 
+TIK_CONTEXT;
+
+typedef struct
+{
+	FILE *fp;
+	uint32_t sig_size;
+	uint64_t title_id;
+	uint16_t title_version;
 	cert_t cert[2];
 	uint16_t content_count;
 	TMD_CONTENT *content;
@@ -146,16 +156,6 @@ typedef struct
 	uint16_t *title_index;
 } __attribute__((__packed__)) 
 TMD_CONTEXT;
-
-typedef struct
-{
-	FILE *fp;
-	uint64_t title_id;
-	uint16_t title_version;
-	uint32_t size;
-	cert_t cert[2];
-} __attribute__((__packed__)) 
-TIK_CONTEXT;
 
 typedef struct
 {
