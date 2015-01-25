@@ -75,9 +75,9 @@ int main(int argc, char *argv[])
 
 	if (tik.titleId != tmd.titleId) {
 		printf("warning: CETK and TMD Title IDs do not match\n"
-			"       CETK Title ID: 0x%016luX\n"
-			"       TMD Title ID:  0x%016luX\n",
-			ctr64toh(tik.titleId), ctr64toh(tmd.titleId));
+			"       CETK Title ID: 0x%016lluX\n"
+			"       TMD Title ID:  0x%016lluX\n",
+			be64toh(tik.titleId), be64toh(tmd.titleId));
 	}
 	if (tik.titleVer != tmd.titleVer) {
 		printf("warning: CETK and TMD Title Versions do not match\n"

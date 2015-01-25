@@ -19,8 +19,10 @@
  */
 
 #include "cia.h"
+#include "endian.h"
 #include <ctype.h>
 #include <errno.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -48,7 +50,7 @@ static size_t getSigSize(uint32_t sig_type)
 
 static size_t getCertSize(uint32_t sig_type)
 {
-	switch (ctr32toh(sig_type)) {
+	switch (be32toh(sig_type)) {
 		case SIGTYPE_RSA4096_SHA1:
 		case SIGTYPE_RSA4096_SHA256:
 			return 1220;
@@ -76,20 +78,21 @@ static int buildCIAHdr(CIA_HEADER *cia, const TIK_CONTEXT *tik, const TMD_CONTEX
 		return -1;
 	}
 
-	cia->header_size = sizeof(*cia);
-	cia->type = 0;
-	cia->version = 0;
-	cia->cert_size = tik->caCert.size + tik->xsCert.size + tmd->cpCert.size;
-	cia->tik_size = tik->size;
-	cia->tmd_size = tmd->size;
-	cia->meta_size = 0;
+	cia->header_size = htole32(sizeof(*cia));
+	cia->type = htole16(0);
+	cia->version = htole16(0);
+	cia->cert_size = htole32(tik->caCert.size + tik->xsCert.size + tmd->cpCert.size);
+	cia->tik_size = htole32(tik->size);
+	cia->tmd_size = htole32(tmd->size);
+	cia->meta_size = htole32(0);
 	cia->content_size = 0;
 	for (i = 0; i < tmd->contentCnt; i++)
 		cia->content_size += be64toh(tmd->content[i].size);
+	cia->content_size = htole64(cia->content_size);
 
 	memset(cia->content_index, 0, sizeof(cia->content_index));
 	for (i = 0; i < tmd->contentCnt; i++) {
-		index = ctr16toh(tmd->content[i].content_index);
+		index = be16toh(tmd->content[i].content_index);
 		cia->content_index[index >> 3] |= 0x80 >> (index & 7);
 	}
 
@@ -161,7 +164,7 @@ int writeCIA(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp)
 		return -1;
 	}
 
-	align = cia.cert_size & 0x3F;
+	align = le32toh(cia.cert_size) & 0x3F;
 	if (align)
 		if (fseek(fp, 0x40 - align, SEEK_CUR)) {
 			perror("CIA: error");
@@ -209,12 +212,12 @@ int writeCIA(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp)
 		}
 
 	for (i = 0; i < tmd->contentCnt; i++) {
-		sprintf(buf, "%08x", ctr32toh(tmd->content[i].content_id));
+		sprintf(buf, "%08x", be32toh(tmd->content[i].content_id));
 
 		content = fopen(buf, "rb");
 		if (content == NULL) {
 #ifdef _WIN32
-			sprintf(buf, "0x%08X: error", ctr32toh(tmd->content[i].content_id));
+			sprintf(buf, "0x%08X: error", be32toh(tmd->content[i].content_id));
 			perror(buf);
 			return -1;
 #else
@@ -224,7 +227,7 @@ int writeCIA(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp)
 
 			content = fopen(buf, "rb");
 			if (content == NULL) {
-				sprintf(buf, "0x%08X: error", ctr32toh(tmd->content[i].content_id));
+				sprintf(buf, "0x%08X: error", be32toh(tmd->content[i].content_id));
 				perror(buf);
 				return -1;
 			}
@@ -232,7 +235,7 @@ int writeCIA(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp)
 		}
 		for (left = be64toh(tmd->content[i].size); left > sizeof(buf); left -= sizeof(buf)) {
 			if (fread(buf, sizeof(buf), 1, content) <= 0) {
-				sprintf(buf, "0x%08X: error", ctr32toh(tmd->content[i].content_id));
+				sprintf(buf, "0x%08X: error", be32toh(tmd->content[i].content_id));
 				perror(buf);
 				return -1;
 			}
@@ -242,7 +245,7 @@ int writeCIA(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp)
 			}
 		}
 		if (fread(buf, left, 1, content) <= 0) {
-			sprintf(buf, "0x%08X: error", ctr32toh(tmd->content[i].content_id));
+			sprintf(buf, "0x%08X: error", be32toh(tmd->content[i].content_id));
 			perror(buf);
 			return -1;
 		}
@@ -275,7 +278,7 @@ int processTIK(TIK_CONTEXT *tik_context)
 		return -1;
 	if (fread(&sigType, sizeof(sigType), 1, tik_context->fp) <= 0)
 		return -1;
-	tik_context->size = getSigSize(ctr32toh(sigType));
+	tik_context->size = getSigSize(be32toh(sigType));
 	if (!tik_context->size) {
 		printf("CETK: error: The signature could not be recognized.\n");
 		return -1;
@@ -290,14 +293,14 @@ int processTIK(TIK_CONTEXT *tik_context)
 
 	tik_context->size += sizeof(tik_struct);
 	tik_context->titleId = tik_struct.titleId;
-	tik_context->titleVer = ctr16toh(tik_struct.titleVer);
+	tik_context->titleVer = be16toh(tik_struct.titleVer);
 
 	tik_context->xsCert.offset = tik_context->size;
 	if (fread(&sigType, sizeof(sigType), 1, tik_context->fp) <= 0) {
 		perror("CETK: error");
 		return -1;
 	}
-	tik_context->xsCert.size = getCertSize(ctr32toh(sigType));
+	tik_context->xsCert.size = getCertSize(be32toh(sigType));
 	if (!tik_context->xsCert.size) {
 		printf("CETK: error: xs certificate is unrecognized.\n");
 		return -1;
@@ -308,7 +311,7 @@ int processTIK(TIK_CONTEXT *tik_context)
 		return -1;
 	if (fread(&sigType, sizeof(sigType), 1, tik_context->fp) <= 0)
 		return -1;
-	tik_context->caCert.size = getCertSize(ctr32toh(sigType));
+	tik_context->caCert.size = getCertSize(be32toh(sigType));
 	if (!tik_context->caCert.size) {
 		printf("CETK: error: ca certificate is unrecognized.\n");
 		return -1;
@@ -335,7 +338,7 @@ int processTMD(TMD_CONTEXT *tmd_context)
 		perror("TMD: error");
 		return -1;
 	}
-	tmd_context->size = getSigSize(ctr32toh(sigType));
+	tmd_context->size = getSigSize(be32toh(sigType));
 	if (!tmd_context->size) {
 		printf("TMD: error: The signature cannot be recognized.\n");
 		return -1;
@@ -352,9 +355,9 @@ int processTMD(TMD_CONTEXT *tmd_context)
 
 	tmd_context->size += sizeof(tmd_struct);
 	tmd_context->titleId = tmd_struct.title_id;
-	tmd_context->titleVer = ctr16toh(tmd_struct.title_version);
+	tmd_context->titleVer = be16toh(tmd_struct.title_version);
 
-	tmd_context->contentCnt = ctr16toh(tmd_struct.contentCnt);
+	tmd_context->contentCnt = be16toh(tmd_struct.contentCnt);
 	tmd_context->size += sizeof(TMD_CONTENT) * tmd_context->contentCnt;
 	tmd_context->content = malloc(sizeof(TMD_CONTENT) * tmd_context->contentCnt);
 	if (fread(tmd_context->content, sizeof(TMD_CONTENT), tmd_context->contentCnt, tmd_context->fp)
@@ -368,7 +371,7 @@ int processTMD(TMD_CONTEXT *tmd_context)
 		perror("TMD: error");
 		return -1;
 	}
-	tmd_context->cpCert.size = getCertSize(ctr32toh(sigType));
+	tmd_context->cpCert.size = getCertSize(be32toh(sigType));
 	if (!tmd_context->cpCert.size) {
 		printf("TMD: error: cp certificate is unrecognized.\n");
 		return -1;
@@ -379,7 +382,7 @@ int processTMD(TMD_CONTEXT *tmd_context)
 		return -1;
 	if (fread(&sigType, sizeof(sigType), 1, tmd_context->fp) <= 0)
 		return -1;
-	tmd_context->caCert.size = getCertSize(ctr32toh(sigType));
+	tmd_context->caCert.size = getCertSize(be32toh(sigType));
 	if (!tmd_context->caCert.size) {
 		printf("TMD: error: ca certificate is unrecognized.\n");
 		return -1;
