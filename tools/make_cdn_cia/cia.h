@@ -78,8 +78,8 @@ typedef struct
 
 typedef struct
 {
-	uint8_t padding_0[0x3c];
-	uint8_t issuer[0x40];
+	uint8_t padding_0[60];
+	uint8_t issuer[64];
 	uint8_t version;
 	uint8_t ca_crl_version;
 	uint8_t signer_crl_version;
@@ -90,7 +90,7 @@ typedef struct
 {
 	uint32_t content_id;
 	uint16_t content_index;
-	uint8_t content_type[2];
+	uint16_t content_type;
 	uint64_t size;
 	uint8_t sha_256_hash[0x20];
 } TMD_CONTENT;
@@ -98,41 +98,41 @@ typedef struct
 typedef struct
 {
 	TMD_SIG_STRUCT tmd_sig;
-	uint8_t system_version[8];
+	uint64_t system_version;
 	uint64_t title_id;
-	uint8_t title_type[4];
-	uint8_t reserved[0x40];
-	uint8_t access_rights[4];
+	uint32_t title_type;
+	uint8_t reserved[64];
+	uint32_t access_rights;
 	uint16_t title_version;
 	uint16_t content_count;
-	uint8_t boot_content[2];
+	uint16_t boot_content;
 	uint8_t padding[2];
-	uint8_t sha_256_hash[0x20];
-	uint8_t content_info_records[0x900];
+	uint8_t sha_256_hash[32];
+	uint8_t content_info_records[2304];
 } TMD_STRUCT;
 
 typedef struct
 {
-	uint8_t padding_0[0x3c];
-	uint8_t issuer[0x40];
-	uint8_t ECDH[0x3c];
+	uint8_t padding_0[60];
+	uint8_t issuer[64];
+	uint8_t ECDH[60];
 	uint8_t unknown[3];
 } TIK_SIG_STRUCT;
 
 typedef struct
 {
 	TIK_SIG_STRUCT tik_sig;
-	uint8_t encrypted_title_key[0x10];
+	uint8_t encrypted_title_key[16];
 	uint8_t unknown_0;
-	uint8_t ticket_id[8];
-	uint8_t ticket_consoleID[4];
+	uint64_t ticket_id;
+	uint32_t ticket_consoleID;
 	uint64_t title_id;
 	uint8_t unknown_1[2];
 	uint16_t title_version;
 	uint8_t unused_0[8];
 	uint8_t unused_1;
 	uint8_t common_key_index;
-	uint8_t unknown_2[0x15e];
+	uint8_t unknown_2[350];
 } TIK_STRUCT;
 
 typedef struct
