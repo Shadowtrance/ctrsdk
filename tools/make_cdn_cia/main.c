@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
 		perror("CETK: error");
 		return errno;
 	}
-	if (process_tik(&tik)) {
+	if (processTIK(&tik)) {
 		fclose(tik.fp);
 		return errno;
 	}
@@ -66,27 +66,27 @@ int main(int argc, char *argv[])
 		fclose(tik.fp);
 		return errno;
 	}
-	if (process_tmd(&tmd)) {
+	if (processTMD(&tmd)) {
 		fclose(out);
 		fclose(tik.fp);
 		fclose(tmd.fp);
 		return errno;
 	}
 
-	if (tik.title_id != tmd.title_id) {
+	if (tik.titleId != tmd.titleId) {
 		printf("warning: CETK and TMD Title IDs do not match\n"
 			"       CETK Title ID: 0x%016luX\n"
 			"       TMD Title ID:  0x%016luX\n",
-			ctr64toh(tik.title_id), ctr64toh(tmd.title_id));
+			ctr64toh(tik.titleId), ctr64toh(tmd.titleId));
 	}
-	if (tik.title_version != tmd.title_version) {
+	if (tik.titleVer != tmd.titleVer) {
 		printf("warning: CETK and TMD Title Versions do not match\n"
-			"       CETK Title Ver: %d\n"
-			"       TMD Title Ver:  %d\n",
-			tik.title_version, tmd.title_version);
+			"       CETK Title Version: %d\n"
+			"       TMD Title Version:  %d\n",
+			tik.titleVer, tmd.titleVer);
 	}
 	
-	if (generate_cia(&tmd, &tik, out)) {
+	if (writeCIA(&tmd, &tik, out)) {
 		fclose(out);
 		fclose(tik.fp);
 		fclose(tmd.fp);

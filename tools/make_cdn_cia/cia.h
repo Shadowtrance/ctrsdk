@@ -102,7 +102,7 @@ typedef struct
 	uint8_t reserved[64];
 	uint32_t access_rights;
 	uint16_t title_version;
-	uint16_t content_count;
+	uint16_t contentCnt;
 	uint16_t boot_content;
 	uint8_t padding[2];
 	uint8_t sha_256_hash[32];
@@ -124,9 +124,9 @@ typedef struct
 	uint8_t unknown_0;
 	uint64_t ticket_id;
 	uint32_t ticket_consoleID;
-	uint64_t title_id;
+	uint64_t titleId;
 	uint8_t unknown_1[2];
-	uint16_t title_version;
+	uint16_t titleVer;
 	uint8_t unused_0[8];
 	uint8_t unused_1;
 	uint8_t common_key_index;
@@ -136,21 +136,23 @@ typedef struct
 typedef struct
 {
 	FILE *fp;
-	uint32_t sig_ize;
-	uint64_t title_id;
-	uint16_t title_version;
-	cert_t cert[2];
+	size_t size;
+	uint64_t titleId;
+	uint16_t titleVer;
+	cert_t xsCert;
+	cert_t caCert;
 } __attribute__((__packed__)) 
 TIK_CONTEXT;
 
 typedef struct
 {
 	FILE *fp;
-	uint32_t sig_size;
-	uint64_t title_id;
-	uint16_t title_version;
-	cert_t cert[2];
-	uint16_t content_count;
+	size_t size;
+	uint64_t titleId;
+	uint16_t titleVer;
+	cert_t cpCert;
+	cert_t caCert;
+	uint16_t contentCnt;
 	TMD_CONTENT *content;
 	
 	uint16_t *title_index;
@@ -170,7 +172,7 @@ typedef struct
 	uint8_t content_index[8192];
 } CIA_HEADER;
 
-int generate_cia(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp);
+int writeCIA(const TMD_CONTEXT *tmd, const TIK_CONTEXT *tik, FILE *fp);
 
-int process_tik(TIK_CONTEXT *tik_context);
-int process_tmd(TMD_CONTEXT *tmd_context);
+int processTIK(TIK_CONTEXT *tik_context);
+int processTMD(TMD_CONTEXT *tmd_context);
