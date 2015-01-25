@@ -26,8 +26,8 @@
 
 int main(int argc, char *argv[])
 {
-	TIK_CONTEXT tik;
-	TMD_CONTEXT tmd;
+	TIKCtx tik;
+	TMDCtx tmd;
 	FILE *out;
 
 	if(argc != 3) {
