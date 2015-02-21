@@ -19,6 +19,7 @@
  */
 
 #include "cia.h"
+#include "ctr_endian.h"
 #include <errno.h>
 #include <unistd.h>
 
@@ -73,11 +74,11 @@ int main(int argc, char *argv[])
 		return errno;
 	}
 
-	if (tik.titleId != tmd.titleId) {
+	if (tik.titleID != tmd.titleID) {
 		printf("warning: CETK and TMD Title IDs do not match\n"
 			"       CETK Title ID: 0x%016lluX\n"
 			"       TMD Title ID:  0x%016lluX\n",
-			be64toh(tik.titleId), be64toh(tmd.titleId));
+			be64toh(tik.titleID), be64toh(tmd.titleID));
 	}
 	
 	if (writeCIA(&tmd, &tik, out)) {

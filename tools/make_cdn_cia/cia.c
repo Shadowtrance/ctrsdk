@@ -19,7 +19,7 @@
  */
 
 #include "cia.h"
-#include "endian.h"
+#include "ctr_endian.h"
 #include <ctype.h>
 #include <errno.h>
 #include <stdint.h>

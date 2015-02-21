@@ -1,6 +1,5 @@
-#ifndef _ENDIAN_H_
+#if !defined(_ENDIAN_H) && !defined(_ENDIAN_H_)
 #define _ENDIAN_H_
-
 #ifdef __INTEL_COMPILER
 #define __builtin_bswap16(v) ((uint16_t)_bswap16((__int16)(v)))
 #define __builtin_bswap16(v) ((uint16_t)_bswap16((__int16)(v)))
@@ -17,7 +16,9 @@
 #define __builtin_bswap16(v) ((uint64_t)_byteswap_uint64((unsigned __int64)(v)))
 #endif
 
-#if __BYTE_ORDER__ ==  __ORDER_BIG_ENDIAN__ || BYTE_ORDER == BIG_ENDIAN
+#if (defined(__BYTE_ORDER__) && __BYTE_ORDER__ ==  __ORDER_BIG_ENDIAN__) || \
+	(defined(__BYTE_ORDER) && __BYTE_ORDER == __BIG_ENDIAN) || \
+	(defined(BYTE_ORDER) && BYTE_ORDER == BIG_ENDIAN)
 #define htobe16
 #define htole16 __builtin_bswap16
 #define be16toh
