@@ -29,7 +29,7 @@
 
 static size_t getSigSize(uint32_t sigType)
 {
-	switch (sigType) {
+	switch (be32toh(sigType)) {
 		case SIGTYPE_RSA4096_SHA1:
 		case SIGTYPE_RSA4096_SHA256:
 			return 516;
@@ -278,7 +278,7 @@ int processTIK(TIKCtx *tik)
 		return -1;
 	if (fread(&sigType, sizeof(sigType), 1, tik->fp) <= 0)
 		return -1;
-	tik->size = getSigSize(be32toh(sigType));
+	tik->size = getSigSize(sigType);
 	if (!tik->size) {
 		printf("CETK: error: The signature could not be recognized.\n");
 		return -1;
@@ -299,7 +299,7 @@ int processTIK(TIKCtx *tik)
 		perror("CETK: error");
 		return -1;
 	}
-	tik->xsCert.size = getCertSize(be32toh(sigType));
+	tik->xsCert.size = getCertSize(sigType);
 	if (!tik->xsCert.size) {
 		printf("CETK: error: xs certificate is unrecognized.\n");
 		return -1;
@@ -310,7 +310,7 @@ int processTIK(TIKCtx *tik)
 		return -1;
 	if (fread(&sigType, sizeof(sigType), 1, tik->fp) <= 0)
 		return -1;
-	tik->caCert.size = getCertSize(be32toh(sigType));
+	tik->caCert.size = getCertSize(sigType);
 	if (!tik->caCert.size) {
 		printf("CETK: error: ca certificate is unrecognized.\n");
 		return -1;
@@ -337,7 +337,7 @@ int processTMD(TMDCtx *tmd)
 		perror("TMD: error");
 		return -1;
 	}
-	tmd->size = getSigSize(be32toh(sigType));
+	tmd->size = getSigSize(sigType);
 	if (!tmd->size) {
 		printf("TMD: error: The signature cannot be recognized.\n");
 		return -1;
@@ -369,7 +369,7 @@ int processTMD(TMDCtx *tmd)
 		perror("TMD: error");
 		return -1;
 	}
-	tmd->cpCert.size = getCertSize(be32toh(sigType));
+	tmd->cpCert.size = getCertSize(sigType);
 	if (!tmd->cpCert.size) {
 		printf("TMD: error: cp certificate is unrecognized.\n");
 		return -1;
@@ -380,7 +380,7 @@ int processTMD(TMDCtx *tmd)
 		return -1;
 	if (fread(&sigType, sizeof(sigType), 1, tmd->fp) <= 0)
 		return -1;
-	tmd->caCert.size = getCertSize(be32toh(sigType));
+	tmd->caCert.size = getCertSize(sigType);
 	if (!tmd->caCert.size) {
 		printf("TMD: error: ca certificate is unrecognized.\n");
 		return -1;
