@@ -38,27 +38,23 @@ typedef struct
 
 typedef struct
 {
+	uint8_t pad[60];
 	uint8_t issuer[64];
-	uint8_t eccPubKey[60];
+	uint8_t ecdh[60];
 	uint8_t ver;
 	uint8_t caCrlVer;
 	uint8_t signerCrlVer;
 	uint8_t titleKey[16];
-	uint8_t pad;
+	uint8_t pad1;
 	uint64_t id;
 	uint32_t devID;
 	uint64_t titleID;
-	uint8_t pad1[2];
+	uint8_t pad2[2];
 	uint16_t tikVer;
-	uint8_t pad2[8];
+	uint8_t pad3[8];
 	uint8_t licence;
 	uint8_t keyID;
-	uint8_t pad3[42];
-	uint32_t accID;
-	uint8_t pad4;
-	uint8_t audit;
-	uint8_t pad5[66];
-	uint8_t limits[64];
+	uint8_t unk[350];
 } TIKHdr;
 
 typedef struct
