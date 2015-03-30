@@ -20,6 +20,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include "chunkio.h"
 
 enum {
 	SIGTYPE_RSA4096_SHA1 = 0x10000,
@@ -32,13 +33,18 @@ enum {
 
 typedef struct
 {
-	uint32_t offset;
-	uint32_t size;
-} cert_t;
+	FILE *fp;
+	uint64_t titleID;
+	uint16_t titleVer;
+	chunk_t headerChunk;
+	chunk_t xsCert;
+	chunk_t caCert;
+} TIKCtx;
 
+// Pack stuff to avoid weird behaviour and padding in 64-bit systems
+#pragma pack(1)
 typedef struct
 {
-	uint8_t pad[60];
 	uint8_t issuer[64];
 	uint8_t ecdh[60];
 	uint8_t ver;
@@ -54,18 +60,14 @@ typedef struct
 	uint8_t pad3[8];
 	uint8_t licence;
 	uint8_t keyID;
-	uint8_t unk[350];
+	uint8_t pad4[42];
+	uint32_t accountId;
+	uint8_t pad5;
+	uint8_t audit;
+	uint8_t pad6[66];
+	uint8_t limits[64];
+	uint8_t contentIndex[172];
 } TIKHdr;
-
-typedef struct
-{
-	FILE *fp;
-	size_t size;
-	uint64_t titleID;
-	uint16_t titleVer;
-	cert_t xsCert;
-	cert_t caCert;
-} TIKCtx;
 
 typedef struct
 {
@@ -111,11 +113,11 @@ typedef struct
 typedef struct
 {
 	FILE *fp;
-	size_t size;
 	uint64_t titleID;
 	uint16_t titleVer;
-	cert_t cpCert;
-	cert_t caCert;
+	chunk_t headerChunk;
+	chunk_t cpCert;
+	chunk_t caCert;
 	uint16_t contentCnt;
 	TMDContent *content;
 
@@ -134,6 +136,7 @@ typedef struct
 	uint64_t contentSize;
 	uint8_t contentIndex[8192];
 } CIAHdr;
+#pragma pack()
 
 int writeCIA(const TMDCtx *tmd, const TIKCtx *tik, FILE *fp);
 

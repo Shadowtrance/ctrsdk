@@ -2,18 +2,12 @@
 #define _ENDIAN_H_
 #ifdef __INTEL_COMPILER
 #define __builtin_bswap16(v) ((uint16_t)_bswap16((__int16)(v)))
-#define __builtin_bswap16(v) ((uint16_t)_bswap16((__int16)(v)))
-#define __builtin_bswap16(v) ((uint32_t)_bswap((int)(v)))
-#define __builtin_bswap16(v) ((uint32_t)_bswap((int)(v)))
-#define __builtin_bswap16(v) ((uint64_t)_bswap64((__int64)(v)))
-#define __builtin_bswap16(v) ((uint64_t)_bswap64((__int64)(v)))
+#define __builtin_bswap32(v) ((uint32_t)_bswap((int)(v)))
+#define __builtin_bswap64(v) ((uint64_t)_bswap64((__int64)(v)))
 #elif _MSC_VER >= 1400
 #define __builtin_bswap16(v) ((uint16_t)_byteswap_ushort((unsigned short)(v)))
-#define __builtin_bswap16(v) ((uint16_t)_byteswap_ushort((unsigned short)(v)))
-#define __builtin_bswap16(v) ((uint32_t)_byteswap_ulong((unsigned long)(v)))
-#define __builtin_bswap16(v) ((uint32_t)_byteswap_ulong((unsigned long)(v)))
-#define __builtin_bswap16(v) ((uint64_t)_byteswap_uint64((unsigned __int64)(v)))
-#define __builtin_bswap16(v) ((uint64_t)_byteswap_uint64((unsigned __int64)(v)))
+#define __builtin_bswap32(v) ((uint32_t)_byteswap_ulong((unsigned long)(v)))
+#define __builtin_bswap64(v) ((uint64_t)_byteswap_uint64((unsigned __int64)(v)))
 #endif
 
 #if (defined(__BYTE_ORDER__) && __BYTE_ORDER__ ==  __ORDER_BIG_ENDIAN__) || \

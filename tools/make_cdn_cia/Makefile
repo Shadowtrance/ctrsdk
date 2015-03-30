@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -O2 -Wall
 TARGET = make_cdn_cia
-OBJS = main.o cia.o
+OBJS = main.o cia.o chunkio.o
 
 all: $(TARGET)
 

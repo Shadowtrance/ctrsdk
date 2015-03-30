@@ -26,21 +26,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 static size_t getSigSize(uint32_t sigType)
 {
 	switch (be32toh(sigType)) {
 		case SIGTYPE_RSA4096_SHA1:
 		case SIGTYPE_RSA4096_SHA256:
-			return 516;
+			return 512;
 
 		case SIGTYPE_RSA2048_SHA1:
 		case SIGTYPE_RSA2048_SHA256:
-			return 260;
+			return 256;
 
 		case SIGTYPE_ECDSA_SHA1:
 		case SIGTYPE_ECDSA_SHA256:
-			return 64;
+			return 60;
 
 		default:
 			errno = EILSEQ;
@@ -69,21 +70,80 @@ static size_t getCertSize(uint32_t sigType)
 	}
 }
 
+static int certSaveAndSkip(FILE * f, chunk_t * cert)
+{
+	uint32_t typeId;
+	size_t certSize;
+
+	chunkMarkStart(cert, f);
+
+	if (fread(&typeId, sizeof(uint32_t), 1, f) != 1)
+	{
+		perror("certSaveAndSkip: unable to read type ID");
+		return -1;
+	}
+
+	certSize = getCertSize(typeId);
+	if (!certSize)
+	{
+		fprintf(stderr, "certSaveAndSkip: unknown cert type ID: %08X\n", typeId);
+		return -1;
+	}
+
+	if (fseek(f, certSize, SEEK_CUR))
+	{
+		perror("certSaveAndSkip: unable to skip certificate data");
+		return -1;
+	}
+
+	chunkMarkEnd(cert, f);
+
+	return 0;
+}
+
+static int skipSignature(FILE * f)
+{
+	uint32_t sigType;
+	size_t size;
+
+	// Read signature type
+	if (fread(&sigType, sizeof(sigType), 1, f) != 1)
+	{
+		perror("skipSignature: error reading signature type");
+		return -1;
+	}
+
+	// Calculate signature size, and skip it
+	size = getSigSize(sigType);
+	if (fseek(f, size, SEEK_CUR))
+	{
+		perror("skipSignature: error seeking");
+		return -1;
+	}
+
+	if (!alignFilePointer(f, 64))
+	{
+		perror("skipSignature: error aligning file pointer");
+		return -1;
+	}
+
+	return 0;
+}
+
 static int buildCIAHdr(CIAHdr *cia, const TIKCtx *tik, const TMDCtx *tmd)
 {
 	uint16_t index, i;
 
-	if (cia == NULL || tik == NULL || tmd == NULL) {
-		errno = EFAULT;
-		return -1;
-	}
+	assert(cia != NULL);
+	assert(tik != NULL);
+	assert(tmd != NULL);
 
 	cia->hdrSize = htole32(sizeof(*cia));
 	cia->type = htole16(0);
 	cia->ver = htole16(0);
 	cia->certSize = htole32(tik->caCert.size + tik->xsCert.size + tmd->cpCert.size);
-	cia->tikSize = htole32(tik->size);
-	cia->tmdSize = htole32(tmd->size);
+	cia->tikSize = htole32(tik->headerChunk.size);
+	cia->tmdSize = htole32(tmd->headerChunk.size);
 	cia->metaSize = htole32(0);
 	cia->contentSize = 0;
 	for (i = 0; i < tmd->contentCnt; i++)
@@ -105,7 +165,6 @@ int writeCIA(const TMDCtx *tmd, const TIKCtx *tik, FILE *fp)
 	FILE *content;
 	char buf[1220];
 	uint16_t i;
-	long align;
 	size_t left;
 
 	buildCIAHdr(&cia, tik, tmd);
@@ -118,98 +177,43 @@ int writeCIA(const TMDCtx *tmd, const TIKCtx *tik, FILE *fp)
 		return -1;
 	}
 
-	align = sizeof(CIAHdr) & 0x3F;
-	if (align)
-		if (fseek(fp, 0x40 - align, SEEK_CUR)) {
-			perror("CIA: error");
-			return -1;
-		}
+	alignFilePointer(fp, 64);
 
-	if (fseek(tik->fp, tik->caCert.offset, SEEK_SET)) {
-		perror("TIK: errror");
-		return -1;
-	}
-	if (fread(buf, tik->caCert.size, 1, tik->fp) <= 0) {
-		perror("TIK: errror");
-		return -1;
-	}
-	if (fwrite(buf, tik->caCert.size, 1, fp) <= 0) {
-		perror("CIA: error");
+	if (!chunkAppendToFile(&tik->caCert, fp))
+	{
+		perror("CIA: could not add CA cert to cia");
 		return -1;
 	}
 
-	if (fseek(tik->fp, tik->xsCert.offset, SEEK_SET)) {
-		perror("TIK: errror");
-		return -1;
-	}
-	if (fread(buf, tik->xsCert.size, 1, tik->fp) <= 0) {
-		perror("TIK: errror");
-		return -1;
-	}
-	if (fwrite(buf, tik->xsCert.size, 1, fp) <= 0) {
-		perror("CIA: error");
+	if (!chunkAppendToFile(&tik->xsCert, fp))
+	{
+		perror("CIA: could not add XS cert to cia");
 		return -1;
 	}
 
-	if (fseek(tmd->fp, tmd->cpCert.offset, SEEK_SET)) {
-		perror("TMD: errror");
-		return -1;
-	}
-	if (fread(buf, tmd->cpCert.size, 1, tmd->fp) <= 0) {
-		perror("TMD: errror");
-		return -1;
-	}
-	if (fwrite(buf, tmd->cpCert.size, 1, fp) <= 0) {
-		perror("CIA: error");
+	if (!chunkAppendToFile(&tmd->cpCert, fp))
+	{
+		perror("CIA: could not add CP cert to cia");
 		return -1;
 	}
 
-	align = le32toh(cia.certSize) & 0x3F;
-	if (align)
-		if (fseek(fp, 0x40 - align, SEEK_CUR)) {
-			perror("CIA: error");
-			return -1;
-		}
+	alignFilePointer(fp, 64);
 
-	if (fseek(tik->fp, 0, SEEK_SET)) {
-		perror("TIK: errror");
-		return -1;
-	}
-	if (fread(buf, tik->size, 1, tik->fp) <= 0) {
-		perror("TIK: errror");
-		return -1;
-	}
-	if (fwrite(buf, tik->size, 1, fp) <= 0) {
-		perror("CIA: error");
+	if (!chunkAppendToFile(&tik->headerChunk, fp))
+	{
+		perror("CIA: could not add ticket data to cia");
 		return -1;
 	}
 
-	align = tik->size & 0x3F;
-	if (align)
-		if (fseek(fp, 0x40 - align, SEEK_CUR)) {
-			perror("CIA: error");
-			return -1;
-		}
+	alignFilePointer(fp, 64);
 
-	if (fseek(tmd->fp, 0, SEEK_SET)) {
-		perror("TMD: errror");
-		return -1;
-	}
-	if (fread(buf, tmd->size, 1, tmd->fp) < 0) {
-		perror("TMD: errror");
-		return -1;
-	}
-	if (fwrite(buf, tmd->size, 1, fp) <= 0) {
-		perror("CIA: error");
+	if (!chunkAppendToFile(&tmd->headerChunk, fp))
+	{
+		perror("CIA: could not add tmd data to cia");
 		return -1;
 	}
 
-	align = tmd->size & 0x3F;
-	if (align)
-		if (fseek(fp, 0x40 - align, SEEK_CUR)) {
-			perror("CIA: error");
-			return -1;
-		}
+	alignFilePointer(fp, 64);
 
 	for (i = 0; i < tmd->contentCnt; i++) {
 		sprintf(buf, "%08x", be32toh(tmd->content[i].id));
@@ -267,52 +271,47 @@ int writeCIA(const TMDCtx *tmd, const TIKCtx *tik, FILE *fp)
 int processTIK(TIKCtx *tik)
 {
 	TIKHdr hdr;
-	uint32_t sigType;
 
-	if (tik == NULL) {
-		errno = EFAULT;
-		return -1;
-	}
+	// Check for programming errors
+	assert(tik != NULL);
 
+	// Rewind file
 	if (fseek(tik->fp, 0, SEEK_SET))
-		return -1;
-	if (fread(&sigType, sizeof(sigType), 1, tik->fp) <= 0)
-		return -1;
-	tik->size = getSigSize(sigType);
-	if (!tik->size) {
-		printf("CETK: error: The signature could not be recognized.\n");
+	{
+		perror("CETK: error rewinding file");
 		return -1;
 	}
 
-	if (fseek(tik->fp, tik->size, SEEK_SET))
+	chunkMarkStart(&tik->headerChunk, tik->fp);
+
+	// Read signature type
+	if (skipSignature(tik->fp))
+	{
+		perror("CETK: error skipping leading signature");
 		return -1;
-	if (fread(&hdr, sizeof(hdr), 1, tik->fp) <= 0) {
+	}
+
+	// Now read ticket header to extract title ID
+	if (fread(&hdr, sizeof(hdr), 1, tik->fp) <= 0)
+	{
 		perror("CETK: error");
 		return -1;
 	}
-
-	tik->size += sizeof(hdr);
 	tik->titleID = hdr.titleID;
 
-	tik->xsCert.offset = tik->size;
-	if (fread(&sigType, sizeof(sigType), 1, tik->fp) <= 0) {
-		perror("CETK: error");
-		return -1;
-	}
-	tik->xsCert.size = getCertSize(sigType);
-	if (!tik->xsCert.size) {
-		printf("CETK: error: xs certificate is unrecognized.\n");
+	chunkMarkEnd(&tik->headerChunk, tik->fp);
+
+	// Read "XS" cert
+	if (certSaveAndSkip(tik->fp, &tik->xsCert))
+	{
+		fprintf(stderr, "CETK: Unable to extract XS certificate\n");
 		return -1;
 	}
 
-	tik->caCert.offset = tik->xsCert.offset + tik->xsCert.size;
-	if (fseek(tik->fp, tik->caCert.offset, SEEK_SET))
-		return -1;
-	if (fread(&sigType, sizeof(sigType), 1, tik->fp) <= 0)
-		return -1;
-	tik->caCert.size = getCertSize(sigType);
-	if (!tik->caCert.size) {
-		printf("CETK: error: ca certificate is unrecognized.\n");
+	// Read CA cert
+	if (certSaveAndSkip(tik->fp, &tik->caCert))
+	{
+		fprintf(stderr, "CETK: Unable to extract CA certificate\n");
 		return -1;
 	}
 
@@ -322,41 +321,34 @@ int processTIK(TIKCtx *tik)
 int processTMD(TMDCtx *tmd)
 {
 	TMDHdr hdr;
-	uint32_t sigType;
 
-	if (tmd == NULL) {
-		errno = EFAULT;
-		return -1;
-	}
+	// Check for programming errors
+	assert(tmd != NULL);
 
-	if (fseek(tmd->fp, 0, SEEK_SET)) {
-		perror("TMD: error");
-		return -1;
-	}
-	if (fread(&sigType, sizeof(sigType), 1, tmd->fp) <= 0) {
-		perror("TMD: error");
-		return -1;
-	}
-	tmd->size = getSigSize(sigType);
-	if (!tmd->size) {
-		printf("TMD: error: The signature cannot be recognized.\n");
+	// Rewind file
+	if (fseek(tmd->fp, 0, SEEK_SET))
+	{
+		perror("TMD: error rewinding file");
 		return -1;
 	}
 
-	if (fseek(tmd->fp, tmd->size, SEEK_SET)) {
-		perror("TMD: error");
-		return -1;
-	}
-	if (fread(&hdr, sizeof(hdr), 1, tmd->fp)) {
-		perror("TMD: error");
+	chunkMarkStart(&tmd->headerChunk, tmd->fp);
+
+	// Read signature type
+	if (skipSignature(tmd->fp))
+	{
+		perror("TMD: error skipping leading signature");
 		return -1;
 	}
 
-	tmd->size += sizeof(hdr);
+	if (fread(&hdr, sizeof(hdr), 1, tmd->fp) != 1)
+	{
+		perror("TMD: error reading header");
+		return -1;
+	}
 	tmd->titleID = hdr.titleID;
 
 	tmd->contentCnt = be16toh(hdr.contentCnt);
-	tmd->size += sizeof(TMDContent) * tmd->contentCnt;
 	tmd->content = malloc(sizeof(TMDContent) * tmd->contentCnt);
 	if (fread(tmd->content, sizeof(TMDContent), tmd->contentCnt, tmd->fp)
 		< tmd->contentCnt) {
@@ -364,25 +356,17 @@ int processTMD(TMDCtx *tmd)
 		return -1;
 	}
 
-	tmd->cpCert.offset = tmd->size;
-	if (fread(&sigType, sizeof(sigType), 1, tmd->fp) <= 0) {
-		perror("TMD: error");
-		return -1;
-	}
-	tmd->cpCert.size = getCertSize(sigType);
-	if (!tmd->cpCert.size) {
-		printf("TMD: error: cp certificate is unrecognized.\n");
+	chunkMarkEnd(&tmd->headerChunk, tmd->fp);
+
+	if (certSaveAndSkip(tmd->fp, &tmd->cpCert))
+	{
+		fprintf(stderr, "TMD: Unable to extract CP certificate\n");
 		return -1;
 	}
 
-	tmd->caCert.offset = tmd->cpCert.offset + tmd->cpCert.size;
-	if (fseek(tmd->fp, tmd->caCert.offset, SEEK_SET))
-		return -1;
-	if (fread(&sigType, sizeof(sigType), 1, tmd->fp) <= 0)
-		return -1;
-	tmd->caCert.size = getCertSize(sigType);
-	if (!tmd->caCert.size) {
-		printf("TMD: error: ca certificate is unrecognized.\n");
+	if (certSaveAndSkip(tmd->fp, &tmd->caCert))
+	{
+		fprintf(stderr, "TMD: Unable to extract CA certificate\n");
 		return -1;
 	}
 
