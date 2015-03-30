@@ -54,11 +54,11 @@ static size_t getCertSize(uint32_t sigType)
 	switch (be32toh(sigType)) {
 		case SIGTYPE_RSA4096_SHA1:
 		case SIGTYPE_RSA4096_SHA256:
-			return 1220;
+			return 1020;
 
 		case SIGTYPE_RSA2048_SHA1:
 		case SIGTYPE_RSA2048_SHA256:
-			return 708;
+			return 764;
 
 		case SIGTYPE_ECDSA_SHA1:
 		case SIGTYPE_ECDSA_SHA256:
