@@ -54,16 +54,22 @@ bool fastClone(FILE * in, FILE * out, size_t size)
 	{
 		if (fread(STATIC_BUFFER, STATIC_BUFFER_SIZE, 1, in) != 1)
 			return false;
-
+		fprintf(stderr, "freadin\n");
 		if (fwrite(STATIC_BUFFER, STATIC_BUFFER_SIZE, 1, out) != 1)
 			return false;
+		fprintf(stderr, "fwritein\n");
 	}
 
-	if (fread(STATIC_BUFFER, remaining, 1, in) != 1)
-		return false;
+	if (remaining != 0)
+	{
+		fprintf(stderr, "freadm %08X %08X %08X\n", ftell(in), size, ftell(in) + size);
+		if (fread(STATIC_BUFFER, remaining, 1, in) != 1)
+			return false;
 
-	if (fwrite(STATIC_BUFFER, remaining, 1, out) != 1)
-		return false;
+		fprintf(stderr, "fwritem\n");
+		if (fwrite(STATIC_BUFFER, remaining, 1, out) != 1)
+			return false;
+	}
 
 	return true;
 }
