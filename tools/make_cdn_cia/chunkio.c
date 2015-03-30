@@ -45,11 +45,10 @@ void initBuffer()
 	exit(1);
 }
 
-bool fastClone(FILE * in, FILE * out, size_t size)
+bool fastClone(FILE * in, FILE * out, size_t remaining)
 {
 	initBuffer();
 
-	size_t remaining = size;
 	while (remaining > STATIC_BUFFER_SIZE)
 	{
 		if (fread(STATIC_BUFFER, STATIC_BUFFER_SIZE, 1, in) != 1)
@@ -57,6 +56,8 @@ bool fastClone(FILE * in, FILE * out, size_t size)
 
 		if (fwrite(STATIC_BUFFER, STATIC_BUFFER_SIZE, 1, out) != 1)
 			return false;
+
+		remaining -= STATIC_BUFFER_SIZE;
 	}
 
 	if (remaining != 0)
